@@ -1,0 +1,15 @@
+BasedOnStyle: Chromium
+UseTab: ForContinuationAndIndentation
+IndentWidth: 4
+AccessModifierOffset: -4
+TabWidth: 4
+
+IndentAccessModifiers: false
+RequiresClausePosition: OwnLine
+SeparateDefinitionBlocks: Always
+AlwaysBreakTemplateDeclarations: Yes
+
+SpacesInLineCommentPrefix:
+	Minimum: 1
+
+AllowShortFunctionsOnASingleLine: Inline
