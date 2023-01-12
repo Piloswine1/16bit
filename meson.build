@@ -13,6 +13,7 @@ main_incdir = include_directories('src')
 src = files([
   'src/cpu.cpp',
   'src/memory.cpp',
+  'src/writablememory.cpp',
 ])
 
 fmt = subproject('fmt').get_variable('fmt_dep')
@@ -31,6 +32,12 @@ memory_tests = executable('memory_tests',
   include_directories: [tests_incdir, main_incdir],
   dependencies: [fmt, plog])
 test('memory tests', memory_tests)
+
+writable_memory_tests = executable('writable_memory_tests',
+  sources: ['tests/writablememory.cpp', src],
+  include_directories: [tests_incdir, main_incdir],
+  dependencies: [fmt, plog])
+test('writable memory tests', writable_memory_tests)
 
 cpu_tests = executable('cpu_tests',
   sources: ['tests/cpu.cpp', src],

@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"options": {
+		"cwd": "build"
+	},
+	"type": "shell",
+	"tasks": [
+		{
+			"label": "build",
+			"command": "ninja"
+		},
+		{
+			"label": "test",
+			"command": "ninja test"
+		}
+	]
+}
