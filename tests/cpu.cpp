@@ -49,21 +49,26 @@ int main() {
 	"integrational sum"_test = [] {
 		const auto mem = Memory(256);
 		auto writableMemory = mem.makeWritable();
+		const auto R1 = 2;
+		const auto R2 = 3;
+
+		auto i = 0;
+
 		auto cpu = CPU::CPU(mem);
 
-		writableMemory[0] = Instructions::MOV_LIT_REG;
-		writableMemory[1] = 0x12;
-		writableMemory[2] = 0x34;
-		writableMemory[3] = 0x2;
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0x12;
+		writableMemory[i++] = 0x34;
+		writableMemory[i++] = R1;
 
-		writableMemory[4] = Instructions::MOV_LIT_REG;
-		writableMemory[5] = 0xAB;
-		writableMemory[6] = 0xCD;
-		writableMemory[7] = 0x3;
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0xAB;
+		writableMemory[i++] = 0xCD;
+		writableMemory[i++] = R2;
 
-		writableMemory[8] = Instructions::ADD_REG_REG;
-		writableMemory[9] = 2;
-		writableMemory[10] = 3;
+		writableMemory[i++] = Instructions::ADD_REG_REG;
+		writableMemory[i++] = R1;
+		writableMemory[i++] = R2;
 
 		cpu.step();
 		cpu.step();

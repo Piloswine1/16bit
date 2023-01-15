@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <numeric>
 
 #include "cpu.hpp"
 #include "fmt/core.h"
@@ -61,12 +62,25 @@ void CPU::step() {
 void CPU::debug() {
 	for (const auto& key : global_registers) {
 		const auto regAddr = this->getRegister(key);
-		LOGI << fmt::format("[{}]: {:#04x}", key, *regAddr);
+		LOGI << fmt::format("[{}]: {:#06x}", key, *regAddr);
 	}
 }
 
-void CPU::viewMemoryAt(std::uint16_t) {
-	// TODO: make print 8 bytes after given addr
+void CPU::viewMemoryAt(std::uint16_t startPos) {
+	auto res = fmt::format("{:#06x}:", startPos);
+
+	for (std::size_t it = startPos; it < startPos + 2 * 8; it = it + 2) {
+		const auto val = this->_memory.getUint16(it);
+		res += fmt::format(" {:#06x}", val);
+	}
+
+	LOGI << res;
+	// TODO: Learn ranges in cpp
+	// return fmt::format("{}: {}", startVal,
+	// 				   std::views::iota(static_cast<int>(startPos + 1))
+	// 				   | std::views::take(7)
+	// 				   | std::views::transform([]() {})
+	// 				   | std::views::join);
 }
 
 void CPU::execute(std::uint16_t instruction) {
@@ -108,6 +122,16 @@ void CPU::execute(std::uint16_t instruction) {
 			const auto regVal1 = this->_registers.getUint16(r1 * 2);
 			const auto regVal2 = this->_registers.getUint16(r2 * 2);
 			this->setRegister("acc", regVal1 + regVal2);
+			return;
+		}
+		case Instructions::JMP_NOT_EQ: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value != this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
 			return;
 		}
 	}

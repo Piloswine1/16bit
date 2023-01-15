@@ -1,46 +1,77 @@
 #include <fmt/core.h>
 #include <plog/Appenders/ConsoleAppender.h>
 #include <plog/Init.h>
+#include <string>
 
 #include "cpu.hpp"
 #include "instructions.hpp"
 #include "plog/Log.h"
+#include "plog/Severity.h"
 
 static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
 
 int main() {
-	plog::init(plog::debug, &consoleAppender);
-	const auto mem = Memory(256);
+	plog::init(plog::info, &consoleAppender);
+	const auto mem = Memory(256 * 256);
 	auto writableMemory = mem.makeWritable();
+
+	// const auto IP = 0;
+	const auto ACC = 1;
+	const auto R1 = 2;
+	const auto R2 = 3;
+
+	auto i = 0;
 
 	auto cpu = CPU::CPU(mem);
 
-	writableMemory[0] = Instructions::MOV_LIT_REG;
-	writableMemory[1] = 0x12;
-	writableMemory[2] = 0x34;
-	writableMemory[3] = 0x2;
+	writableMemory[i++] = Instructions::MOV_MEM_REG;
+	writableMemory[i++] = 0x01;
+	writableMemory[i++] = 0x00;
+	writableMemory[i++] = R1;
 
-	writableMemory[4] = Instructions::MOV_LIT_REG;
-	writableMemory[5] = 0xAB;
-	writableMemory[6] = 0xCD;
-	writableMemory[7] = 0x3;
+	writableMemory[i++] = Instructions::MOV_LIT_REG;
+	writableMemory[i++] = 0x00;
+	writableMemory[i++] = 0x01;
+	writableMemory[i++] = R2;
 
-	writableMemory[8] = Instructions::ADD_REG_REG;
-	writableMemory[9] = 2;
-	writableMemory[10] = 3;
+	writableMemory[i++] = Instructions::ADD_REG_REG;
+	writableMemory[i++] = R1;
+	writableMemory[i++] = R2;
 
+	writableMemory[i++] = Instructions::MOV_REG_MEM;
+	writableMemory[i++] = ACC;
+	writableMemory[i++] = 0x01;
+	writableMemory[i++] = 0x00;
 	// LOGI << fmt::format("{}", writableMemory.buf());
 
-	cpu.debug();
+	writableMemory[i++] = Instructions::JMP_NOT_EQ;
+	writableMemory[i++] = 0x00;
+	writableMemory[i++] = 0x03;
+	writableMemory[i++] = 0x00;
+	writableMemory[i++] = 0x00;
 
-	cpu.step();
 	cpu.debug();
+	cpu.viewMemoryAt(*cpu.getRegister("ip"));
+	cpu.viewMemoryAt(0x0100);
 
-	cpu.step();
-	cpu.debug();
+	std::string prevCmd;
+	for (std::string line; std::getline(std::cin, line);) {
+		if (line.empty()) {
+			line = prevCmd;
+		}
 
-	cpu.step();
-	cpu.debug();
+		if (line.starts_with("n")) {
+			cpu.step();
+			cpu.debug();
+			cpu.viewMemoryAt(*cpu.getRegister("ip"));
+			cpu.viewMemoryAt(0x0100);
+		}
+		if (line.starts_with("q")) {
+			break;
+		}
+
+		prevCmd = line;
+	}
 
 	return 1;
 }
