@@ -65,18 +65,40 @@ void CPU::debug() {
 	}
 }
 
+void CPU::viewMemoryAt(std::uint16_t) {
+	// TODO: make print 8 bytes after given addr
+}
+
 void CPU::execute(std::uint16_t instruction) {
 	switch (instruction) {
-		// Move literal
-		case Instructions::MOV_LIT_R1: {
+		// Move literal into reg
+		case Instructions::MOV_LIT_REG: {
 			const auto literal = this->fetch16();
-			this->setRegister("r1", literal);
+			const auto reg = (this->fetch() % global_registers.size()) * 2;
+			this->_registers.setUint16(reg, literal);
+			return;
+		}
+		case Instructions::MOV_REG_REG: {
+			const auto regFrom = (this->fetch() % global_registers.size()) * 2;
+			const auto regTo = (this->fetch() % global_registers.size()) * 2;
+			const auto value = this->_registers.getUint16(regFrom);
+			this->_registers.setUint16(regTo, value);
 			return;
 		}
 		// Move literal
-		case Instructions::MOV_LIT_R2: {
-			const auto literal = this->fetch16();
-			this->setRegister("r2", literal);
+		case Instructions::MOV_REG_MEM: {
+			const auto regFrom = (this->fetch() % global_registers.size()) * 2;
+			const auto addr = this->fetch16();
+			const auto value = this->_registers.getUint16(regFrom);
+			this->_memory.setUint16(addr, value);
+			return;
+		}
+		// Move from memory to reg
+		case Instructions::MOV_MEM_REG: {
+			const auto addr = this->fetch16();
+			const auto regTo = (this->fetch() % global_registers.size()) * 2;
+			const auto value = this->_memory.getUint16(addr);
+			this->_registers.setUint16(regTo, value);
 			return;
 		}
 		// Add registers

@@ -36,8 +36,10 @@ public:
 
 	std::uint8_t fetch();
 	std::uint16_t fetch16();
+
 	void step();
 	void execute(std::uint16_t instruction);
 	void debug();
+	void viewMemoryAt(std::uint16_t addr);
 };
 }  // namespace CPU
