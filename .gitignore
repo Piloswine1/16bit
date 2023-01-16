@@ -2,4 +2,6 @@ builddir/
 cache/
 .cache/
 compile_commands.json
-subprojects/
+subprojects/*
+!subprojects/fmt.wrap
+!subprojects/sergiusthebest-plog.wrap
