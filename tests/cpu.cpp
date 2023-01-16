@@ -49,8 +49,6 @@ int main() {
 	"integrational sum"_test = [] {
 		const auto mem = Memory(256);
 		auto writableMemory = mem.makeWritable();
-		const auto R1 = 2;
-		const auto R2 = 3;
 
 		auto i = 0;
 
@@ -59,16 +57,16 @@ int main() {
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x12;
 		writableMemory[i++] = 0x34;
-		writableMemory[i++] = R1;
+		writableMemory[i++] = CPU::R1;
 
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0xAB;
 		writableMemory[i++] = 0xCD;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R2;
 
 		writableMemory[i++] = Instructions::ADD_REG_REG;
-		writableMemory[i++] = R1;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R1;
+		writableMemory[i++] = CPU::R2;
 
 		cpu.step();
 		cpu.step();
@@ -82,10 +80,6 @@ int main() {
 		auto writableMemory = mem.makeWritable();
 
 		// const auto IP = 0;
-		const auto ACC = 1;
-		const auto R1 = 2;
-		const auto R2 = 3;
-
 		auto i = 0;
 
 		auto cpu = CPU::CPU(mem);
@@ -93,19 +87,19 @@ int main() {
 		writableMemory[i++] = Instructions::MOV_MEM_REG;
 		writableMemory[i++] = 0x01;
 		writableMemory[i++] = 0x00;
-		writableMemory[i++] = R1;
+		writableMemory[i++] = CPU::R1;
 
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x00;
 		writableMemory[i++] = 0x01;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R2;
 
 		writableMemory[i++] = Instructions::ADD_REG_REG;
-		writableMemory[i++] = R1;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R1;
+		writableMemory[i++] = CPU::R2;
 
 		writableMemory[i++] = Instructions::MOV_REG_MEM;
-		writableMemory[i++] = ACC;
+		writableMemory[i++] = CPU::ACC;
 		writableMemory[i++] = 0x01;
 		writableMemory[i++] = 0x00;
 		// LOGI << fmt::format("{}", writableMemory.buf());
@@ -134,32 +128,27 @@ int main() {
 
 		auto cpu = CPU::CPU(mem);
 
-		const auto R1 = 2;
-		const auto R2 = 3;
-		const auto R3 = 4;
-		const auto R4 = 5;
-
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x51;
 		writableMemory[i++] = 0x51;
-		writableMemory[i++] = R1;
+		writableMemory[i++] = CPU::R1;
 
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x42;
 		writableMemory[i++] = 0x42;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R2;
 
 		writableMemory[i++] = Instructions::PSH_REG;
-		writableMemory[i++] = R1;
+		writableMemory[i++] = CPU::R1;
 
 		writableMemory[i++] = Instructions::PSH_REG;
-		writableMemory[i++] = R2;
+		writableMemory[i++] = CPU::R2;
 
 		writableMemory[i++] = Instructions::POP;
-		writableMemory[i++] = R3;
+		writableMemory[i++] = CPU::R3;
 
 		writableMemory[i++] = Instructions::POP;
-		writableMemory[i++] = R4;
+		writableMemory[i++] = CPU::R4;
 
 		cpu.step();
 		cpu.step();

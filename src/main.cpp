@@ -1,5 +1,6 @@
 #include <fmt/core.h>
-#include <plog/Appenders/ConsoleAppender.h>
+#include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Formatters/MessageOnlyFormatter.h>
 #include <plog/Init.h>
 #include <string>
 
@@ -8,10 +9,10 @@
 #include "plog/Log.h"
 #include "plog/Severity.h"
 
-static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
+static plog::ColorConsoleAppender<plog::MessageOnlyFormatter> colorConsoleAppender;
 
 int main() {
-	plog::init(plog::info, &consoleAppender);
+	plog::init(plog::info, &colorConsoleAppender);
 	const auto mem = Memory(256 * 256);
 	auto writableMemory = mem.makeWritable();
 
@@ -19,10 +20,6 @@ int main() {
 	auto i = 0;
 
 	auto cpu = CPU::CPU(mem);
-
-	const auto R1 = 2;
-	const auto R4 = 5;
-	const auto R8 = 9;
 
 	writableMemory[i++] = Instructions::PSH_LIT;
 	writableMemory[i++] = 0x33;
@@ -39,12 +36,12 @@ int main() {
 	writableMemory[i++] = Instructions::MOV_LIT_REG;
 	writableMemory[i++] = 0x12;
 	writableMemory[i++] = 0x34;
-	writableMemory[i++] = R1;
+	writableMemory[i++] = CPU::R1;
 
 	writableMemory[i++] = Instructions::MOV_LIT_REG;
 	writableMemory[i++] = 0x56;
 	writableMemory[i++] = 0x78;
-	writableMemory[i++] = R4;
+	writableMemory[i++] = CPU::R4;
 
 	writableMemory[i++] = Instructions::PSH_LIT;
 	writableMemory[i++] = 0x00;
@@ -75,12 +72,12 @@ int main() {
 	writableMemory[i++] = Instructions::MOV_LIT_REG;
 	writableMemory[i++] = 0x07;
 	writableMemory[i++] = 0x08;
-	writableMemory[i++] = R1;
+	writableMemory[i++] = CPU::R1;
 
 	writableMemory[i++] = Instructions::MOV_LIT_REG;
 	writableMemory[i++] = 0x09;
 	writableMemory[i++] = 0x10;
-	writableMemory[i++] = R8;
+	writableMemory[i++] = CPU::R8;
 
 	writableMemory[i++] = Instructions::RET;
 

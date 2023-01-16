@@ -20,6 +20,16 @@ static const std::array<std::string_view, 12> global_registers{
 	"sp", "fp"
 };
 
+static const auto ACC = 1;
+static const auto R1 = 2;
+static const auto R2 = 3;
+static const auto R3 = 4;
+static const auto R4 = 5;
+static const auto R5 = 6;
+static const auto R6 = 7;
+static const auto R7 = 8;
+static const auto R8 = 9;
+
 class CPU {
 private:
 	Memory _memory;
