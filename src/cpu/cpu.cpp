@@ -8,7 +8,7 @@
 #include "plog/Log.h"
 
 namespace CPU {
-CPU::CPU(Memory mem) : _memory(mem), _registers(global_registers.size() * 2) {
+CPU::CPU(std::unique_ptr<IMemoryMappedDevice> mm) : _memory(std::move(mm)), _registers(global_registers.size() * 2) {
 	_register_map.reserve(global_registers.size());
 
 	for (std::size_t i = 0; i < global_registers.size(); i++) {
@@ -16,16 +16,16 @@ CPU::CPU(Memory mem) : _memory(mem), _registers(global_registers.size() * 2) {
 		LOGD << fmt::format("[{}]: {}", global_registers[i], i * 2);
 	}
 
-	this->setRegister("sp", _memory.getByteLen() - 2);
-	this->setRegister("fp", _memory.getByteLen() - 2);
+	this->setRegister("sp", 0xffff - 1);
+	this->setRegister("fp", 0xffff - 1);
 }
 
 std::uint16_t CPU::getMem16(std::size_t pos) const {
-	return _memory.getUint16(pos);
+	return _memory->getUint16(pos);
 }
 
 std::uint8_t CPU::getMem(std::size_t pos) const {
-	return _memory.getUint8(pos);
+	return _memory->getUint8(pos);
 }
 
 std::optional<std::uint16_t> CPU::getRegister(const std::string_view& reg) {
@@ -46,7 +46,7 @@ std::uint8_t CPU::fetch() {
 	// FIXME: use optional
 	if (!nextInstrcutionAddress)
 		return 0;
-	const auto instruction = this->_memory.getUint8(*nextInstrcutionAddress);
+	const auto instruction = this->_memory->getUint8(*nextInstrcutionAddress);
 	this->setRegister("ip", *nextInstrcutionAddress + 1);
 	return instruction;
 }
@@ -56,14 +56,21 @@ std::uint16_t CPU::fetch16() {
 	// FIXME: use optional
 	if (!nextInstrcutionAddress)
 		return 0;
-	const auto instruction = this->_memory.getUint16(*nextInstrcutionAddress);
+	const auto instruction = this->_memory->getUint16(*nextInstrcutionAddress);
 	this->setRegister("ip", *nextInstrcutionAddress + 2);
 	return instruction;
 }
 
-void CPU::step() {
+void CPU::run() {
+	auto halt = false;
+	while (!halt) {
+		halt = this->step();
+	}
+}
+
+bool CPU::step() {
 	const auto instruction = this->fetch();
-	this->execute(instruction);
+	return this->execute(instruction);
 }
 
 void CPU::debug() {
@@ -75,7 +82,7 @@ void CPU::debug() {
 
 void CPU::push(std::uint16_t value) {
 	const auto spAddr = this->getRegister("sp");
-	this->_memory.setUint16(*spAddr, value);
+	this->_memory->setUint16(*spAddr, value);
 	this->setRegister("sp", *spAddr - 2);
 	this->_stackframe_size += 2;
 }
@@ -84,7 +91,7 @@ std::uint16_t CPU::pop() {
 	const auto nextSpAddr = *this->getRegister("sp") + 2;
 	this->setRegister("sp", nextSpAddr);
 	this->_stackframe_size -= 2;
-	return this->_memory.getUint16(nextSpAddr);
+	return this->_memory->getUint16(nextSpAddr);
 }
 
 std::uint16_t CPU::fetchRegisterIndex() {
@@ -136,7 +143,7 @@ void CPU::viewMemoryAt(std::uint16_t startPos, std::size_t n) {
 	auto res = fmt::format("{:#06x}:", startPos);
 
 	for (std::size_t it = startPos; it < startPos + 2 * n; it = it + 2) {
-		const auto val = this->_memory.getUint16(it);
+		const auto val = this->_memory->getUint16(it);
 		res += fmt::format(" {:#06x}", val);
 	}
 
@@ -149,46 +156,46 @@ void CPU::viewMemoryAt(std::uint16_t startPos, std::size_t n) {
 	// 				   | std::views::join);
 }
 
-void CPU::execute(std::uint16_t instruction) {
+bool CPU::execute(std::uint16_t instruction) {
 	switch (instruction) {
 		// Move literal into reg
 		case Instructions::MOV_LIT_REG: {
 			const auto literal = this->fetch16();
 			const auto reg = this->fetchRegisterIndex();
 			this->_registers.setUint16(reg, literal);
-			return;
+			return false;
 		}
 		case Instructions::MOV_REG_REG: {
 			const auto regFrom = this->fetchRegisterIndex();
 			const auto regTo = this->fetchRegisterIndex();
 			const auto value = this->_registers.getUint16(regFrom);
 			this->_registers.setUint16(regTo, value);
-			return;
+			return false;
 		}
 		// Move literal
 		case Instructions::MOV_REG_MEM: {
 			const auto regFrom = this->fetchRegisterIndex();
 			const auto addr = this->fetch16();
 			const auto value = this->_registers.getUint16(regFrom);
-			this->_memory.setUint16(addr, value);
-			return;
+			this->_memory->setUint16(addr, value);
+			return false;
 		}
 		// Move from memory to reg
 		case Instructions::MOV_MEM_REG: {
 			const auto addr = this->fetch16();
 			const auto regTo = this->fetchRegisterIndex();
-			const auto value = this->_memory.getUint16(addr);
+			const auto value = this->_memory->getUint16(addr);
 			this->_registers.setUint16(regTo, value);
-			return;
+			return false;
 		}
 		// Add registers
 		case Instructions::ADD_REG_REG: {
-			const auto r1 = this->fetch();
-			const auto r2 = this->fetch();
-			const auto regVal1 = this->_registers.getUint16(r1 * 2);
-			const auto regVal2 = this->_registers.getUint16(r2 * 2);
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
 			this->setRegister("acc", regVal1 + regVal2);
-			return;
+			return false;
 		}
 		case Instructions::JMP_NOT_EQ: {
 			const auto value = this->fetch16();
@@ -198,41 +205,46 @@ void CPU::execute(std::uint16_t instruction) {
 				this->setRegister("ip", addr);
 			}
 
-			return;
+			return false;
 		}
 		case Instructions::PSH_LIT: {
 			const auto value = this->fetch16();
 			this->push(value);
-			return;
+			return false;
 		}
 		case Instructions::PSH_REG: {
 			const auto regIndex = this->fetchRegisterIndex();
 			this->push(this->_registers.getUint16(regIndex));
-			return;
+			return false;
 		}
 		case Instructions::POP: {
 			const auto regIndex = this->fetchRegisterIndex();
 			const auto value = this->pop();
 			this->_registers.setUint16(regIndex, value);
-			return;
+			return false;
 		}
 		case Instructions::CALL_LIT: {
 			const auto addr = this->fetch16();
 			this->pushState();
 			this->setRegister("ip", addr);
-			return;
+			return false;
 		}
 		case Instructions::CALL_REG: {
 			const auto regIndex = this->fetchRegisterIndex();
 			const auto addr = this->_registers.getUint16(regIndex);
 			this->pushState();
 			this->setRegister("ip", addr);
-			return;
+			return false;
 		}
 		case Instructions::RET: {
 			this->popState();
-			return;
+			return false;
+		}
+		case Instructions::HLT: {
+			return true;
 		}
 	}
+	// TODO: somewhat return error
+	return true;
 }
 }  // namespace CPU

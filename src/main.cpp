@@ -2,107 +2,48 @@
 #include <plog/Appenders/ColorConsoleAppender.h>
 #include <plog/Formatters/MessageOnlyFormatter.h>
 #include <plog/Init.h>
+#include <plog/Log.h>
+#include <plog/Severity.h>
+#include <cstdint>
+#include <memory>
 #include <string>
 
-#include "cpu.hpp"
-#include "instructions.hpp"
-#include "plog/Log.h"
-#include "plog/Severity.h"
+#include "cpu/cpu.hpp"
+#include "cpu/instructions.hpp"
+#include "devices/screendevice.hpp"
+#include "memory/memorymapper.hpp"
 
-static plog::ColorConsoleAppender<plog::MessageOnlyFormatter> colorConsoleAppender;
+static plog::ColorConsoleAppender<plog::MessageOnlyFormatter>
+	colorConsoleAppender;
 
 int main() {
 	plog::init(plog::info, &colorConsoleAppender);
-	const auto mem = Memory(256 * 256);
-	auto writableMemory = mem.makeWritable();
 
-	const auto subroutineAddr = 0x3000;
+	auto MM = std::make_unique<MemoryMapper>();
+
+	const auto mem = std::make_shared<Memory>(256 * 256);
+	auto writableMemory = mem->makeWritable();
+
+	MM->map({mem, 0, 0xffff});
+	MM->map({std::make_shared<ScreenDevice>(), 0x3000, 0x30ff, true});
+
 	auto i = 0;
 
-	auto cpu = CPU::CPU(mem);
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x33;
-	writableMemory[i++] = 0x33;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x22;
-	writableMemory[i++] = 0x22;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x11;
-	writableMemory[i++] = 0x11;
+	auto cpu = CPU::CPU(std::move(MM));
 
 	writableMemory[i++] = Instructions::MOV_LIT_REG;
-	writableMemory[i++] = 0x12;
-	writableMemory[i++] = 0x34;
+	writableMemory[i++] = 0x00;
+	writableMemory[i++] = static_cast<uint8_t>('H');
 	writableMemory[i++] = CPU::R1;
 
-	writableMemory[i++] = Instructions::MOV_LIT_REG;
-	writableMemory[i++] = 0x56;
-	writableMemory[i++] = 0x78;
-	writableMemory[i++] = CPU::R4;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x00;
-	writableMemory[i++] = 0x00;
-
-	writableMemory[i++] = Instructions::CALL_LIT;
-	writableMemory[i++] = (subroutineAddr & 0xff00) >> 8;
-	writableMemory[i++] = (subroutineAddr & 0x00ff);
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x04;
-	writableMemory[i++] = 0x04;
-
-	i = subroutineAddr;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x01;
-	writableMemory[i++] = 0x02;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x03;
-	writableMemory[i++] = 0x04;
-
-	writableMemory[i++] = Instructions::PSH_LIT;
-	writableMemory[i++] = 0x05;
-	writableMemory[i++] = 0x06;
-
-	writableMemory[i++] = Instructions::MOV_LIT_REG;
-	writableMemory[i++] = 0x07;
-	writableMemory[i++] = 0x08;
+	writableMemory[i++] = Instructions::MOV_REG_MEM;
 	writableMemory[i++] = CPU::R1;
+	writableMemory[i++] = 0x30;
+	writableMemory[i++] = 0x00;
 
-	writableMemory[i++] = Instructions::MOV_LIT_REG;
-	writableMemory[i++] = 0x09;
-	writableMemory[i++] = 0x10;
-	writableMemory[i++] = CPU::R8;
+	writableMemory[i++] = Instructions::HLT;
 
-	writableMemory[i++] = Instructions::RET;
 
-	cpu.debug();
-	cpu.viewMemoryAt(*cpu.getRegister("ip"), 4);
-	cpu.viewMemoryAt(0xffff - 1 - 42, 22);
-
-	std::string prevCmd;
-	for (std::string line; std::getline(std::cin, line);) {
-		if (line.empty()) {
-			line = prevCmd;
-		}
-
-		if (line.starts_with("n")) {
-			cpu.step();
-			cpu.debug();
-			cpu.viewMemoryAt(*cpu.getRegister("ip"));
-			cpu.viewMemoryAt(0xffff - 1 - 42, 22);
-		}
-		if (line.starts_with("q")) {
-			break;
-		}
-
-		prevCmd = line;
-	}
-
+	cpu.run();
 	return 1;
 }

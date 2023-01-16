@@ -1,13 +1,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
-#include "memory.hpp"
+#include "memory/memory.hpp"
 
 // TODO: make array reduction explicitly constexpr
 // template <std::size_t N>
@@ -32,13 +33,13 @@ static const auto R8 = 9;
 
 class CPU {
 private:
-	Memory _memory;
+	std::unique_ptr<IMemoryMappedDevice> _memory;
 	Memory _registers;
 	std::size_t _stackframe_size = 0;
 	std::unordered_map<std::string_view, int> _register_map;
 
 public:
-	CPU(Memory);
+	CPU(std::unique_ptr<IMemoryMappedDevice> mm);
 
 	std::uint16_t getMem16(std::size_t pos) const;
 	std::uint8_t getMem(std::size_t pos) const;
@@ -57,8 +58,9 @@ public:
 	std::uint8_t fetch();
 	std::uint16_t fetch16();
 
-	void step();
-	void execute(std::uint16_t instruction);
+	bool step();
+	void run();
+	bool execute(std::uint16_t instruction);
 	void debug();
 	void viewMemoryAt(std::uint16_t addr, std::size_t n = 8);
 };

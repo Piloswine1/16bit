@@ -11,5 +11,6 @@ const static auto POP         = 0x18;
 const static auto CALL_LIT    = 0x19;
 const static auto CALL_REG    = 0x20;
 const static auto RET         = 0x21;
+const static auto HLT         = 0x22;
 
 }  // namespace Instructions

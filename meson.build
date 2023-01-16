@@ -11,9 +11,10 @@ project(
 main_incdir = include_directories('src')
 
 src = files([
-  'src/cpu.cpp',
-  'src/memory.cpp',
-  'src/writablememory.cpp',
+  'src/cpu/cpu.cpp',
+  'src/memory/memory.cpp',
+  'src/memory/writablememory.cpp',
+  'src/memory/memorymapper.cpp',
 ])
 
 fmt = subproject('fmt').get_variable('fmt_dep')

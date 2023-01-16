@@ -3,8 +3,8 @@
 #include <plog/Init.h>
 #include <boost/ut.hpp>
 
-#include "cpu.hpp"
-#include "instructions.hpp"
+#include "cpu/cpu.hpp"
+#include "cpu/instructions.hpp"
 
 static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
 
@@ -13,8 +13,8 @@ int main() {
 	using namespace boost::ut;
 
 	"basic cpu"_test = [] {
-		const auto mem = Memory(10);
-		auto cpu = CPU::CPU(mem);
+		auto mem = std::make_unique<Memory>(10);
+		auto cpu = CPU::CPU(std::move(mem));
 
 		cpu.setRegister("r1", 12);
 		expect(*cpu.getRegister("r1") == 12_i);
@@ -24,17 +24,17 @@ int main() {
 	};
 
 	"unknown cpu reg"_test = [] {
-		const auto mem = Memory(10);
-		auto cpu = CPU::CPU(mem);
+		auto mem = std::make_unique<Memory>(10);
+		auto cpu = CPU::CPU(std::move(mem));
 
 		expect(nothrow([&] { cpu.setRegister("non_existent", 42); }));
 		expect(!cpu.getRegister("non_existent"));
 	};
 
 	"mov lit reg"_test = [] {
-		const auto mem = Memory(256);
-		auto writableMemory = mem.makeWritable();
-		auto cpu = CPU::CPU(mem);
+		auto mem = std::make_unique<Memory>(256);
+		auto writableMemory = mem->makeWritable();
+		auto cpu = CPU::CPU(std::move(mem));
 
 		writableMemory[0] = Instructions::MOV_LIT_REG;
 		writableMemory[1] = 0x12;
@@ -47,12 +47,12 @@ int main() {
 	};
 
 	"integrational sum"_test = [] {
-		const auto mem = Memory(256);
-		auto writableMemory = mem.makeWritable();
+		auto mem = std::make_unique<Memory>(256);
+		auto writableMemory = mem->makeWritable();
 
 		auto i = 0;
 
-		auto cpu = CPU::CPU(mem);
+		auto cpu = CPU::CPU(std::move(mem));
 
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x12;
@@ -76,13 +76,13 @@ int main() {
 	};
 
 	"jmp integrational sum"_test = [] {
-		const auto mem = Memory(256 * 256);
-		auto writableMemory = mem.makeWritable();
+		auto mem = std::make_unique<Memory>(256 * 256);
+		auto writableMemory = mem->makeWritable();
 
 		// const auto IP = 0;
 		auto i = 0;
 
-		auto cpu = CPU::CPU(mem);
+		auto cpu = CPU::CPU(std::move(mem));
 
 		writableMemory[i++] = Instructions::MOV_MEM_REG;
 		writableMemory[i++] = 0x01;
@@ -121,12 +121,12 @@ int main() {
 	};
 
 	"push/pop instructions"_test = [] {
-		const auto mem = Memory(256 * 256);
-		auto writableMemory = mem.makeWritable();
+		auto mem = std::make_unique<Memory>(256 * 256);
+		auto writableMemory = mem->makeWritable();
 
 		auto i = 0;
 
-		auto cpu = CPU::CPU(mem);
+		auto cpu = CPU::CPU(std::move(mem));
 
 		writableMemory[i++] = Instructions::MOV_LIT_REG;
 		writableMemory[i++] = 0x51;

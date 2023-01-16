@@ -3,7 +3,7 @@
 #include <plog/Init.h>
 #include <boost/ut.hpp>
 
-#include "memory.hpp"
+#include "memory/memory.hpp"
 
 static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
 

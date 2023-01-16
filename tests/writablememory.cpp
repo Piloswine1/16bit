@@ -3,7 +3,7 @@
 #include <plog/Init.h>
 #include <boost/ut.hpp>
 
-#include "cpu.hpp"
+#include "cpu/cpu.hpp"
 
 static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
 
@@ -12,8 +12,8 @@ int main() {
 	using namespace boost::ut;
 
 	"write"_test = [] {
-		const auto memory = Memory(256);
-		auto writableMemory = memory.makeWritable();
+		auto memory = std::make_unique<Memory>(256);
+		auto writableMemory = memory->makeWritable();
 
 		writableMemory[0] = 12;
 		expect(writableMemory[0] == 12_i);
@@ -32,9 +32,9 @@ int main() {
 	};
 
 	"wih cpu"_test = [] {
-		const auto memory = Memory(256);
-		auto writableMemory = memory.makeWritable();
-		auto cpu = CPU::CPU(memory);
+		auto memory = std::make_unique<Memory>(256);
+		auto writableMemory = memory->makeWritable();
+		auto cpu = CPU::CPU(std::move(memory));
 
 		writableMemory[0] = 12;
 		expect(writableMemory[0] == 12_i);
