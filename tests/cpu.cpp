@@ -76,4 +76,99 @@ int main() {
 
 		expect(*cpu.getRegister("acc") == 48641_i);
 	};
+
+	"jmp integrational sum"_test = [] {
+		const auto mem = Memory(256 * 256);
+		auto writableMemory = mem.makeWritable();
+
+		// const auto IP = 0;
+		const auto ACC = 1;
+		const auto R1 = 2;
+		const auto R2 = 3;
+
+		auto i = 0;
+
+		auto cpu = CPU::CPU(mem);
+
+		writableMemory[i++] = Instructions::MOV_MEM_REG;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = R1;
+
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = R2;
+
+		writableMemory[i++] = Instructions::ADD_REG_REG;
+		writableMemory[i++] = R1;
+		writableMemory[i++] = R2;
+
+		writableMemory[i++] = Instructions::MOV_REG_MEM;
+		writableMemory[i++] = ACC;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = 0x00;
+		// LOGI << fmt::format("{}", writableMemory.buf());
+
+		writableMemory[i++] = Instructions::JMP_NOT_EQ;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x03;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x00;
+
+		for (std::size_t i = 0; i < 4; ++i) {
+			cpu.step();
+			cpu.step();
+			cpu.step();
+			cpu.step();
+		}
+
+		expect(cpu.getMem16(0x0100) == 3_i);
+	};
+
+	"push/pop instructions"_test = [] {
+		const auto mem = Memory(256 * 256);
+		auto writableMemory = mem.makeWritable();
+
+		auto i = 0;
+
+		auto cpu = CPU::CPU(mem);
+
+		const auto R1 = 2;
+		const auto R2 = 3;
+		const auto R3 = 4;
+		const auto R4 = 5;
+
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0x51;
+		writableMemory[i++] = 0x51;
+		writableMemory[i++] = R1;
+
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0x42;
+		writableMemory[i++] = 0x42;
+		writableMemory[i++] = R2;
+
+		writableMemory[i++] = Instructions::PSH_REG;
+		writableMemory[i++] = R1;
+
+		writableMemory[i++] = Instructions::PSH_REG;
+		writableMemory[i++] = R2;
+
+		writableMemory[i++] = Instructions::POP;
+		writableMemory[i++] = R3;
+
+		writableMemory[i++] = Instructions::POP;
+		writableMemory[i++] = R4;
+
+		cpu.step();
+		cpu.step();
+		cpu.step();
+		cpu.step();
+		cpu.step();
+		cpu.step();
+
+		expect(*cpu.getRegister("r3") == 16962_i);
+		expect(*cpu.getRegister("r4") == 20817_i);
+	};
 };

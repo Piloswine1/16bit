@@ -7,6 +7,10 @@ Memory::Memory(std::size_t size) {
 	_buffer = std::make_shared<std::vector<std::uint8_t>>(size, 0);
 }
 
+std::size_t Memory::getByteLen() const {
+	return _buffer->size();
+}
+
 std::uint8_t Memory::getUint8(std::size_t index) const {
 	return (*_buffer)[index];
 }

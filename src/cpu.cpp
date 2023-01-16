@@ -15,6 +15,13 @@ CPU::CPU(Memory mem) : _memory(mem), _registers(global_registers.size() * 2) {
 		_register_map.emplace(global_registers[i], i * 2);
 		LOGD << fmt::format("[{}]: {}", global_registers[i], i * 2);
 	}
+
+	this->setRegister("sp", _memory.getByteLen() - 2);
+	this->setRegister("fp", _memory.getByteLen() - 2);
+}
+
+std::uint16_t CPU::getMem16(std::size_t pos) const {
+	return _memory.getUint16(pos);
 }
 
 std::uint8_t CPU::getMem(std::size_t pos) const {
@@ -66,10 +73,69 @@ void CPU::debug() {
 	}
 }
 
-void CPU::viewMemoryAt(std::uint16_t startPos) {
+void CPU::push(std::uint16_t value) {
+	const auto spAddr = this->getRegister("sp");
+	this->_memory.setUint16(*spAddr, value);
+	this->setRegister("sp", *spAddr - 2);
+	this->_stackframe_size += 2;
+}
+
+std::uint16_t CPU::pop() {
+	const auto nextSpAddr = *this->getRegister("sp") + 2;
+	this->setRegister("sp", nextSpAddr);
+	this->_stackframe_size -= 2;
+	return this->_memory.getUint16(nextSpAddr);
+}
+
+std::uint16_t CPU::fetchRegisterIndex() {
+	return (this->fetch() % global_registers.size()) * 2;
+}
+
+void CPU::pushState() {
+	this->push(*this->getRegister("r1"));
+	this->push(*this->getRegister("r2"));
+	this->push(*this->getRegister("r3"));
+	this->push(*this->getRegister("r4"));
+	this->push(*this->getRegister("r5"));
+	this->push(*this->getRegister("r6"));
+	this->push(*this->getRegister("r7"));
+	this->push(*this->getRegister("r8"));
+	this->push(*this->getRegister("ip"));
+	this->push(this->_stackframe_size + 2);
+
+	this->setRegister("fp", *this->getRegister("sp"));
+	this->_stackframe_size = 0;
+}
+
+void CPU::popState() {
+	const auto framePtrAddr = *this->getRegister("fp");
+	this->setRegister("sp", framePtrAddr);
+
+	this->_stackframe_size = this->pop();
+	const auto stackframe_size = this->_stackframe_size;
+
+	this->setRegister("ip", this->pop());
+	this->setRegister("r8", this->pop());
+	this->setRegister("r7", this->pop());
+	this->setRegister("r6", this->pop());
+	this->setRegister("r5", this->pop());
+	this->setRegister("r4", this->pop());
+	this->setRegister("r3", this->pop());
+	this->setRegister("r2", this->pop());
+	this->setRegister("r1", this->pop());
+
+	const auto nArgs = this->pop();
+	for (std::size_t i = 0; i < nArgs; ++i) {
+		this->pop();
+	}
+
+	this->setRegister("fp", framePtrAddr + stackframe_size);
+}
+
+void CPU::viewMemoryAt(std::uint16_t startPos, std::size_t n) {
 	auto res = fmt::format("{:#06x}:", startPos);
 
-	for (std::size_t it = startPos; it < startPos + 2 * 8; it = it + 2) {
+	for (std::size_t it = startPos; it < startPos + 2 * n; it = it + 2) {
 		const auto val = this->_memory.getUint16(it);
 		res += fmt::format(" {:#06x}", val);
 	}
@@ -88,20 +154,20 @@ void CPU::execute(std::uint16_t instruction) {
 		// Move literal into reg
 		case Instructions::MOV_LIT_REG: {
 			const auto literal = this->fetch16();
-			const auto reg = (this->fetch() % global_registers.size()) * 2;
+			const auto reg = this->fetchRegisterIndex();
 			this->_registers.setUint16(reg, literal);
 			return;
 		}
 		case Instructions::MOV_REG_REG: {
-			const auto regFrom = (this->fetch() % global_registers.size()) * 2;
-			const auto regTo = (this->fetch() % global_registers.size()) * 2;
+			const auto regFrom = this->fetchRegisterIndex();
+			const auto regTo = this->fetchRegisterIndex();
 			const auto value = this->_registers.getUint16(regFrom);
 			this->_registers.setUint16(regTo, value);
 			return;
 		}
 		// Move literal
 		case Instructions::MOV_REG_MEM: {
-			const auto regFrom = (this->fetch() % global_registers.size()) * 2;
+			const auto regFrom = this->fetchRegisterIndex();
 			const auto addr = this->fetch16();
 			const auto value = this->_registers.getUint16(regFrom);
 			this->_memory.setUint16(addr, value);
@@ -110,7 +176,7 @@ void CPU::execute(std::uint16_t instruction) {
 		// Move from memory to reg
 		case Instructions::MOV_MEM_REG: {
 			const auto addr = this->fetch16();
-			const auto regTo = (this->fetch() % global_registers.size()) * 2;
+			const auto regTo = this->fetchRegisterIndex();
 			const auto value = this->_memory.getUint16(addr);
 			this->_registers.setUint16(regTo, value);
 			return;
@@ -132,6 +198,39 @@ void CPU::execute(std::uint16_t instruction) {
 				this->setRegister("ip", addr);
 			}
 
+			return;
+		}
+		case Instructions::PSH_LIT: {
+			const auto value = this->fetch16();
+			this->push(value);
+			return;
+		}
+		case Instructions::PSH_REG: {
+			const auto regIndex = this->fetchRegisterIndex();
+			this->push(this->_registers.getUint16(regIndex));
+			return;
+		}
+		case Instructions::POP: {
+			const auto regIndex = this->fetchRegisterIndex();
+			const auto value = this->pop();
+			this->_registers.setUint16(regIndex, value);
+			return;
+		}
+		case Instructions::CALL_LIT: {
+			const auto addr = this->fetch16();
+			this->pushState();
+			this->setRegister("ip", addr);
+			return;
+		}
+		case Instructions::CALL_REG: {
+			const auto regIndex = this->fetchRegisterIndex();
+			const auto addr = this->_registers.getUint16(regIndex);
+			this->pushState();
+			this->setRegister("ip", addr);
+			return;
+		}
+		case Instructions::RET: {
+			this->popState();
 			return;
 		}
 	}
