@@ -15,6 +15,7 @@ src = files([
   'src/memory/memory.cpp',
   'src/memory/writablememory.cpp',
   'src/memory/memorymapper.cpp',
+  'src/devices/screendevice.cpp'
 ])
 
 fmt = subproject('fmt').get_variable('fmt_dep')

@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-#include "IMemoryMapperDevice.hpp"
+#include "IMemoryMappedDevice.hpp"
 
 struct Region {
 	std::shared_ptr<IMemoryMappedDevice> device;
@@ -15,10 +15,10 @@ struct Region {
 
 class MemoryMapper : public IMemoryMappedDevice {
 private:
-	std::vector<Region> regions;
+	std::vector<std::shared_ptr<Region>> regions;
 
 public:
-	std::optional<Region> findRegion(std::uint16_t addr) const;
+	Region const* findRegion(std::uint16_t addr) const;
 	std::uint16_t getUint16(std::uint16_t addr) const override;
 	std::uint8_t getUint8(std::uint16_t addr) const override;
 	void setUint16(std::uint16_t addr, std::uint16_t value) override;

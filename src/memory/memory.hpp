@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "IMemoryMapperDevice.hpp"
+#include "IMemoryMappedDevice.hpp"
 #include "writablememory.hpp"
 
 class Memory: public IMemoryMappedDevice {

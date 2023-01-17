@@ -5,19 +5,19 @@
 #include <memory>
 #include <optional>
 
-std::optional<Region> MemoryMapper::findRegion(std::uint16_t addr) const {
+Region const* MemoryMapper::findRegion(std::uint16_t addr) const {
 	auto found = std::find_if(
 		this->regions.begin(), this->regions.end(),
-		[&addr](const auto& r) { return addr >= r.start && addr <= r.end; });
+		[&addr](const auto& r) { return addr >= r->start && addr <= r->end; });
 	if (found == this->regions.cend())
-		return std::nullopt;
-	return *found;
+		return nullptr;
+	return found->get();
 }
 
 std::function<void()> MemoryMapper::map(const Region& region) {
 	const auto begin = this->regions.begin();
 	const auto it = this->regions.insert(
-		begin, std::move(region));
+		begin, std::make_shared<Region>(region));
 	return [this, &it] { this->regions.erase(it); };
 }
 

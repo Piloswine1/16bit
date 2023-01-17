@@ -1,10 +1,14 @@
 #include <cstdint>
 
-#include "memory/IMemoryMapperDevice.hpp"
+#include "memory/IMemoryMappedDevice.hpp"
 
 class ScreenDevice : public IMemoryMappedDevice {
 private:
 	void moveTo(std::uint16_t x, std::uint16_t y) const;
+	void clear() const;
+	void setBold() const;
+	void setRegular() const;
+	void setDim() const;
 
 public:
 	~ScreenDevice() override = default;
