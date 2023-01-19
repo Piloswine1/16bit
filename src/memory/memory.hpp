@@ -1,12 +1,12 @@
 #include <cstddef>
-#include <vector>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "IMemoryMappedDevice.hpp"
 #include "writablememory.hpp"
 
-class Memory: public IMemoryMappedDevice {
+class Memory final : public IMemoryMappedDevice {
 private:
 	std::shared_ptr<std::vector<std::uint8_t>> _buffer;
 

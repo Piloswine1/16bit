@@ -14,10 +14,10 @@ Region const* MemoryMapper::findRegion(std::uint16_t addr) const {
 	return found->get();
 }
 
-std::function<void()> MemoryMapper::map(const Region& region) {
+std::function<void()> MemoryMapper::map(Region&& region) {
 	const auto begin = this->regions.begin();
 	const auto it = this->regions.insert(
-		begin, std::make_shared<Region>(region));
+		begin, std::make_shared<Region>(std::move(region)));
 	return [this, &it] { this->regions.erase(it); };
 }
 

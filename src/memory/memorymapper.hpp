@@ -7,13 +7,13 @@
 #include "IMemoryMappedDevice.hpp"
 
 struct Region {
-	std::shared_ptr<IMemoryMappedDevice> device;
+	std::unique_ptr<IMemoryMappedDevice> device;
 	std::uint16_t start = 0;
 	std::uint16_t end = 0;
 	bool remap = false;
 };
 
-class MemoryMapper : public IMemoryMappedDevice {
+class MemoryMapper final : public IMemoryMappedDevice {
 private:
 	std::vector<std::shared_ptr<Region>> regions;
 
@@ -24,5 +24,5 @@ public:
 	void setUint16(std::uint16_t addr, std::uint16_t value) override;
 	void setUint8(std::uint16_t addr, std::uint8_t value) override;
 
-	std::function<void()> map(const Region& region);
+	std::function<void()> map(Region&& region);
 };

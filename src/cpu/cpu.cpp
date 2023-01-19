@@ -8,7 +8,8 @@
 #include "plog/Log.h"
 
 namespace CPU {
-CPU::CPU(std::unique_ptr<IMemoryMappedDevice> mm) : _memory(std::move(mm)), _registers(global_registers.size() * 2) {
+CPU::CPU(std::unique_ptr<IMemoryMappedDevice> mm)
+	: _memory(std::move(mm)), _registers(global_registers.size() * 2) {
 	_register_map.reserve(global_registers.size());
 
 	for (std::size_t i = 0; i < global_registers.size(); i++) {
@@ -188,6 +189,31 @@ bool CPU::execute(std::uint16_t instruction) {
 			this->_registers.setUint16(regTo, value);
 			return false;
 		}
+		case Instructions::MOV_LIT_MEM: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+			this->_memory->setUint16(addr, value);
+			return false;
+		}
+		// Move register* to register
+		case Instructions::MOV_REG_PTR_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto ptr = this->_registers.getUint16(r1);
+			const auto value = this->_memory->getUint16(ptr);
+			this->_registers.setUint16(r1, value);
+			return false;
+		}
+		// Move [lit + reg] to register
+		case Instructions::MOV_LIT_OFF_REG: {
+			const auto baseAddr = this->fetch16();
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto offset = this->_registers.getUint16(r1);
+
+			const auto value = this->_memory->getUint16(baseAddr + offset);
+			this->_registers.setUint16(r2, value);
+			return false;
+		}
 		// Add registers
 		case Instructions::ADD_REG_REG: {
 			const auto r1 = this->fetchRegisterIndex();
@@ -197,11 +223,264 @@ bool CPU::execute(std::uint16_t instruction) {
 			this->setRegister("acc", regVal1 + regVal2);
 			return false;
 		}
+		case Instructions::ADD_LIT_REG: {
+			const auto lit = this->fetch16();
+			const auto r1 = this->fetchRegisterIndex();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", lit + regVal);
+			return false;
+		}
+		case Instructions::SUB_LIT_REG: {
+			const auto lit = this->fetch16();
+			const auto r1 = this->fetchRegisterIndex();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", regVal - lit);
+			return false;
+		}
+		case Instructions::SUB_REG_LIT: {
+			const auto lit = this->fetch16();
+			const auto r1 = this->fetchRegisterIndex();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", lit - regVal);
+			return false;
+		}
+		case Instructions::SUB_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->setRegister("acc", regVal1 - regVal2);
+			return false;
+		}
+		case Instructions::MUL_LIT_REG: {
+			const auto lit = this->fetch16();
+			const auto r1 = this->fetchRegisterIndex();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", lit + regVal);
+			return false;
+		}
+		case Instructions::MUL_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->setRegister("acc", regVal1 * regVal2);
+			return false;
+		}
+		case Instructions::INC_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			this->_registers.setUint16(r1, value + 1);
+			return false;
+		}
+		case Instructions::DEC_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			this->_registers.setUint16(r1, value - 1);
+			return false;
+		}
+		case Instructions::LSF_REG_LIT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto lit = this->fetch16();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->_registers.setUint16(r1, regVal << lit);
+			return false;
+		}
+		case Instructions::LSF_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->_registers.setUint16(r1, regVal1 << regVal2);
+			return false;
+		}
+		case Instructions::RSF_REG_LIT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto lit = this->fetch16();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->_registers.setUint16(r1, regVal >> lit);
+			return false;
+		}
+		case Instructions::RSF_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->_registers.setUint16(r1, regVal1 >> regVal2);
+			return false;
+		}
+		case Instructions::AND_REG_LIT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto lit = this->fetch16();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", regVal & lit);
+			return false;
+		}
+		case Instructions::AND_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->setRegister("acc", regVal1 & regVal2);
+			return false;
+		}
+		case Instructions::OR_REG_LIT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto lit = this->fetch16();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", regVal | lit);
+			return false;
+		}
+		case Instructions::OR_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->setRegister("acc", regVal1 | regVal2);
+			return false;
+		}
+		case Instructions::XOR_REG_LIT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto lit = this->fetch16();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->setRegister("acc", regVal ^ lit);
+			return false;
+		}
+		case Instructions::XOR_REG_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
+			const auto regVal1 = this->_registers.getUint16(r1);
+			const auto regVal2 = this->_registers.getUint16(r2);
+			this->setRegister("acc", regVal1 ^ regVal2);
+			return false;
+		}
+		case Instructions::NOT: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto regVal = this->_registers.getUint16(r1);
+			this->_registers.setUint16(r1, (~regVal) & 0xffff);
+			return false;
+		}
 		case Instructions::JMP_NOT_EQ: {
 			const auto value = this->fetch16();
 			const auto addr = this->fetch16();
 
 			if (value != this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JNE_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value != this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JEQ_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value == this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JEQ_LIT: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value == this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JLT_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value < this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JLT_LIT: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value < this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JGT_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value > this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JGT_LIT: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value > this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JLE_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value <= this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JLE_LIT: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value <= this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JGE_REG: {
+			const auto r1 = this->fetchRegisterIndex();
+			const auto value = this->_registers.getUint16(r1);
+			const auto addr = this->fetch16();
+
+			if (value >= this->getRegister("acc")) {
+				this->setRegister("ip", addr);
+			}
+
+			return false;
+		}
+		case Instructions::JGE_LIT: {
+			const auto value = this->fetch16();
+			const auto addr = this->fetch16();
+
+			if (value >= this->getRegister("acc")) {
 				this->setRegister("ip", addr);
 			}
 
@@ -242,6 +521,9 @@ bool CPU::execute(std::uint16_t instruction) {
 		}
 		case Instructions::HLT: {
 			return true;
+		}
+		default: {
+			LOGF << fmt::format("Instruction {:#02x} not implemented", instruction);
 		}
 	}
 	// TODO: somewhat return error

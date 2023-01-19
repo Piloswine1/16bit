@@ -2,7 +2,7 @@
 
 #include "memory/IMemoryMappedDevice.hpp"
 
-class ScreenDevice : public IMemoryMappedDevice {
+class ScreenDevice final : public IMemoryMappedDevice {
 private:
 	void moveTo(std::uint16_t x, std::uint16_t y) const;
 	void clear() const;

@@ -23,13 +23,13 @@ int main() {
 
 	auto MM = std::make_unique<MemoryMapper>();
 
-	const auto mem = std::make_shared<Memory>(256 * 256);
+	auto mem = std::make_unique<Memory>(256 * 256);
 	auto writableMemory = mem->makeWritable();
 
-	const auto screenDevice = std::make_shared<ScreenDevice>();
+	auto screenDevice = std::make_unique<ScreenDevice>();
 
-	MM->map({mem, 0, 0xffff});
-	MM->map({screenDevice, 0x3000, 0x30ff, true});
+	MM->map({std::move(mem), 0, 0xffff});
+	MM->map({std::move(screenDevice), 0x3000, 0x30ff, true});
 
 	auto i = 0;
 
