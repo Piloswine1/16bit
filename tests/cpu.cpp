@@ -120,6 +120,57 @@ int main() {
 		expect(cpu.getMem16(0x0100) == 3_i);
 	};
 
+	"arithmetic ops"_test = [] {
+		auto mem = std::make_unique<Memory>(256 * 256);
+		auto writableMemory = mem->makeWritable();
+
+		auto i = 0;
+
+		auto cpu = CPU::CPU(std::move(mem));
+
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = CPU::R1;
+
+		writableMemory[i++] = Instructions::ADD_LIT_REG;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = CPU::R1;
+
+		cpu.step();
+		cpu.step();
+
+		expect(*cpu.getRegister("r1") == 1_i) << "r1";
+		expect(*cpu.getRegister("acc") == 2_i) << "acc = r1 + 1";
+
+		writableMemory[i++] = Instructions::MOV_REG_REG;
+		writableMemory[i++] = CPU::ACC;
+		writableMemory[i++] = CPU::R2;
+
+		writableMemory[i++] = Instructions::SUB_LIT_REG;
+		writableMemory[i++] = 0x00;
+		writableMemory[i++] = 0x01;
+		writableMemory[i++] = CPU::R2;
+
+		cpu.step();
+		cpu.step();
+
+		expect(*cpu.getRegister("r2") == 2_i) << "r1";
+		expect(*cpu.getRegister("acc") == 1_i) << "acc = 3 - r1";
+	};
+
+	skip / "logic ops"_test = [] {
+		auto mem = std::make_unique<Memory>(256 * 256);
+		auto writableMemory = mem->makeWritable();
+
+		auto i = 0;
+
+		auto cpu = CPU::CPU(std::move(mem));
+
+		writableMemory[i++] = Instructions::MOV_LIT_REG;
+	};
+
 	"push/pop instructions"_test = [] {
 		auto mem = std::make_unique<Memory>(256 * 256);
 		auto writableMemory = mem->makeWritable();
