@@ -41,6 +41,12 @@ writable_memory_tests = executable('writable_memory_tests',
   dependencies: [fmt, plog])
 test('writable memory tests', writable_memory_tests)
 
+memorymapped_tests = executable('memorymapped_tests',
+  sources: ['tests/memorymapped.cpp', src],
+  include_directories: [tests_incdir, main_incdir],
+  dependencies: [fmt, plog])
+test('memorymapped tests', memorymapped_tests)
+
 cpu_tests = executable('cpu_tests',
   sources: ['tests/cpu.cpp', src],
   include_directories: [tests_incdir, main_incdir],
