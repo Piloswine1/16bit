@@ -3,7 +3,25 @@ pub mod common;
 pub mod instructions;
 pub mod parse;
 
-fn main() {}
+use std::path::PathBuf;
+
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Input file
+    input: PathBuf,
+    /// Output file name
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+}
+
+fn main() {
+    let args = Args::parse();
+    println!("Input: {:?}", args.input.display());
+    println!("Output: {:?}", args.output.unwrap_or(PathBuf::from("a.out")).display());
+}
 
 #[test]
 fn code_gen_test() {
@@ -44,8 +62,8 @@ fn parse() {
 #[test]
 fn integrational() {
     use codegen::CodeGen;
-    use instructions::Instructions;
     use common::*;
+    use instructions::Instructions;
     use parse::*;
 
     let parser = Parser::new();
