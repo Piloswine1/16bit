@@ -1,62 +1,106 @@
 #include <fmt/core.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
-#include <plog/Formatters/MessageOnlyFormatter.h>
 #include <plog/Init.h>
 #include <plog/Log.h>
 #include <plog/Severity.h>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
+#include <argparse/argparse.hpp>
+#include <fstream>
+#include <filesystem>
 
-#include "src/utils/macros.hpp"
 #include "cpu/cpu.hpp"
 #include "cpu/instructions.hpp"
 #include "devices/screendevice.hpp"
 #include "memory/memorymapper.hpp"
+#include "src/utils/macros.hpp"
 
-static plog::ColorConsoleAppender<plog::MessageOnlyFormatter>
+static plog::ColorConsoleAppender<plog::TxtFormatter>
 	colorConsoleAppender;
 
-int main() {
+static const auto MEM_SIZE = 256 * 256;
+
+void run_debug(CPU::CPU& cpu) {
+	std::string prevCmd;
+	for (std::string line; std::getline(std::cin, line);) {
+		if (line.empty()) {
+			line = prevCmd;
+		}
+
+		if (line.starts_with("n")) {
+			cpu.step();
+			cpu.debug();
+			cpu.viewMemoryAt(*cpu.getRegister("ip"));
+			cpu.viewMemoryAt(0x0100);
+		}
+		if (line.starts_with("q")) {
+			break;
+		}
+
+		prevCmd = line;
+	}
+}
+
+int main(int argc, char** argv) {
 	plog::init(plog::info, &colorConsoleAppender);
+	argparse::ArgumentParser program("16bit");
+
+	program.add_argument("file").help("mem file to execute");
+
+	program.add_argument("-d", "--debug")
+		.help("runs vm in debug mode")
+		.default_value(false)
+		.nargs(0);
+
+	program.add_description("16 bit virtual machine");
+
+	try {
+		program.parse_args(argc, argv);
+	} catch (const std::runtime_error& err) {
+		std::cerr << err.what() << std::endl;
+		std::cerr << program;
+		std::exit(1);
+	}
+	LOGI << program.get<std::string>("file");
+
+	const auto file_name = program.get<std::string>("file");
+
+	if (!std::filesystem::exists(file_name)) {
+		LOGF << "File does not exists";
+		return 1;
+	}
+	auto file = std::ifstream(file_name, std::ios::in | std::ios::binary);
+	if (!file.is_open()) {
+		LOGF << "Failed to open file";
+		return 1;
+	}
+
+	file.seekg(0, std::ios::end);
+	if (file.tellg() > MEM_SIZE) {
+		LOGF << "Not enough mem to fit all instructions";
+		return 1;
+	}
+	file.seekg(0, std::ios::beg);
 
 	auto MM = std::make_unique<MemoryMapper>();
 
-	auto mem = std::make_unique<Memory>(256 * 256);
+	auto mem = std::make_unique<Memory>(MEM_SIZE);
 	auto writableMemory = mem->makeWritable();
+
+	auto& buf = writableMemory.buf();
+	buf.insert(buf.begin(), std::istream_iterator<uint8_t>(file),
+			   std::istream_iterator<uint8_t>());
 
 	auto screenDevice = std::make_unique<ScreenDevice>();
 
 	MM->map({std::move(mem), 0, 0xffff});
 	MM->map({std::move(screenDevice), 0x3000, 0x30ff, true});
 
-	auto i = 0;
-
 	auto cpu = CPU::CPU(std::move(MM));
 
-	auto writeCharToScreen = [&](const auto& character, const auto& cmd, const auto& pos) {
-		writableMemory[i++] = Instructions::MOV_LIT_REG;
-		writableMemory[i++] = cmd;
-		writableMemory[i++] = static_cast<uint8_t>(character);
-		writableMemory[i++] = CPU::R1;
-
-		writableMemory[i++] = Instructions::MOV_REG_MEM;
-		writableMemory[i++] = CPU::R1;
-		writableMemory[i++] = 0x30;
-		writableMemory[i++] = static_cast<uint8_t>(pos);
-	};
-
-	writeCharToScreen(' ', 0xff, 0);
-
-	//const auto msg = std::string("Vadik, Krasava!");
-	for (size_t i = 0; i <= 0xff; ++i) {
-		const auto cmd = i % 2 == 0 ? 0x03 : 0x02;
-		writeCharToScreen('*', cmd, i);
+	if (program["--debug"] == true) {
+		run_debug(cpu);
+	} else {
+		cpu.run();
 	}
 
-	writableMemory[i++] = Instructions::HLT;
-
-	cpu.run();
 	return 1;
 }

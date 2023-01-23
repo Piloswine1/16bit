@@ -20,11 +20,14 @@ src = files([
 
 fmt = subproject('fmt').get_variable('fmt_dep')
 plog = subproject('sergiusthebest-plog').get_variable('plog_dep')
+argparse = subproject('argparse').get_variable('argparse_dep')
+
+deps = [fmt, plog, argparse]
 
 _exe = executable('16bit',
   sources: ['src/main.cpp', src],
   include_directories: main_incdir,
-  dependencies: [fmt, plog])
+  dependencies: deps)
 
 #-- tests
 tests_incdir = include_directories('tests/include')
@@ -32,24 +35,24 @@ tests_incdir = include_directories('tests/include')
 memory_tests = executable('memory_tests',
   sources: ['tests/memory.cpp', src],
   include_directories: [tests_incdir, main_incdir],
-  dependencies: [fmt, plog])
+  dependencies: deps)
 test('memory tests', memory_tests)
 
 writable_memory_tests = executable('writable_memory_tests',
   sources: ['tests/writablememory.cpp', src],
   include_directories: [tests_incdir, main_incdir],
-  dependencies: [fmt, plog])
+  dependencies: deps)
 test('writable memory tests', writable_memory_tests)
 
 memorymapped_tests = executable('memorymapped_tests',
   sources: ['tests/memorymapped.cpp', src],
   include_directories: [tests_incdir, main_incdir],
-  dependencies: [fmt, plog])
+  dependencies: deps)
 test('memorymapped tests', memorymapped_tests)
 
 cpu_tests = executable('cpu_tests',
   sources: ['tests/cpu.cpp', src],
   include_directories: [tests_incdir, main_incdir],
-  dependencies: [fmt, plog])
+  dependencies: deps)
 test('cpu tests', cpu_tests)
 #---
