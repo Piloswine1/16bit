@@ -53,19 +53,18 @@ impl CodeGen {
         }
     }
 
-    pub fn code_gen(&mut self, commands: &[ASMCommand]) -> CodeGenRes {
+    pub fn code_gen(&self, commands: &[ASMCommand]) -> CodeGenRes {
         let mut res: Vec<u8> = Vec::new();
         for command in commands {
             match command {
                 ASMCommand::Mov(lval, rval) => {
                     let parsed = self.parse_mov(lval, rval)?;
                     res = [res, parsed].concat();
-                    break;
+                }
+                ASMCommand::Hlt => {
+                    res.push(Instructions::HLT as u8);
                 }
             }
-        }
-        if res.len() % 2 != 0 {
-            res.push(0);
         }
         return Ok(res);
     }

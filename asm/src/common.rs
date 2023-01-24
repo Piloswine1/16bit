@@ -28,6 +28,7 @@ pub enum RVal {
 #[derive(Debug, PartialEq)]
 pub enum ASMCommand {
     Mov(LVal, RVal),
+    Hlt,
 }
 
 #[derive(Debug)]

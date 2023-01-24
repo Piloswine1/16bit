@@ -3,7 +3,11 @@ pub mod common;
 pub mod instructions;
 pub mod parse;
 
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{prelude::*, BufReader},
+    path::PathBuf,
+};
 
 use clap::Parser;
 
@@ -12,15 +16,43 @@ use clap::Parser;
 struct Args {
     /// Input file
     input: PathBuf,
+    /// Dump ast
+    #[arg(short, long, default_value_t = false)]
+    dump: bool,
     /// Output file name
     #[arg(short, long)]
     output: Option<PathBuf>,
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
+    use codegen::CodeGen;
+    use parse::Parser;
+
     let args = Args::parse();
-    println!("Input: {:?}", args.input.display());
-    println!("Output: {:?}", args.output.unwrap_or(PathBuf::from("a.out")).display());
+    let parser = Parser::new();
+    let codegen = CodeGen::new();
+
+    let file = File::open(args.input)?;
+    let mut buf_reader = BufReader::new(file);
+    let mut contents = String::new();
+    buf_reader.read_to_string(&mut contents)?;
+
+    let parsed = parser.parse(contents.as_str()).unwrap();
+
+    if args.dump {
+        println!("{:?}", parsed);
+        return Ok(());
+    }
+
+    let binary = codegen.code_gen(parsed.as_slice()).unwrap();
+
+    let out_name = args.output.unwrap_or(PathBuf::from("a.out"));
+    let mut out_file = File::create(&out_name)?;
+    out_file.write_all(binary.as_slice())?;
+
+    println!("Wrote {} bytes to {}", binary.len(), out_name.display());
+
+    Ok(())
 }
 
 #[test]
@@ -29,8 +61,11 @@ fn code_gen_test() {
     use common::*;
     use instructions::Instructions;
 
-    let mut code_gen = CodeGen::new();
-    let res = code_gen.code_gen(&[ASMCommand::Mov(LVal::Hex(0x12u16), RVal::Reg(Regs::R1))]);
+    let code_gen = CodeGen::new();
+    let res = code_gen.code_gen(&[
+        ASMCommand::Mov(LVal::Hex(0x12u16), RVal::Reg(Regs::R1)),
+        ASMCommand::Hlt,
+    ]);
 
     let res_unwrapped = res.unwrap();
     assert_eq!(
@@ -39,10 +74,11 @@ fn code_gen_test() {
             Instructions::MOV_LIT_REG as u8,
             0x00u8,
             0x12u8,
-            Regs::R1 as u8
+            Regs::R1 as u8,
+            Instructions::HLT as u8,
         ]
     );
-    assert_eq!(res_unwrapped, [0x10u8, 0x00u8, 0x12u8, 0x02u8])
+    assert_eq!(res_unwrapped, [0x10u8, 0x00u8, 0x12u8, 0x02u8, 0xffu8])
 }
 
 #[test]
@@ -51,11 +87,11 @@ fn parse() {
     use parse::*;
 
     let parser = Parser::new();
-    let parsed = parser.parse("mov $12 r1");
+    let parsed = parser.parse("mov $12 r1\n hlt");
 
     assert_eq!(
         parsed.unwrap(),
-        [ASMCommand::Mov(LVal::Hex(0x12u16), RVal::Reg(Regs::R1))]
+        [ASMCommand::Mov(LVal::Hex(0x12u16), RVal::Reg(Regs::R1)), ASMCommand::Hlt]
     );
 }
 
@@ -67,7 +103,7 @@ fn integrational() {
     use parse::*;
 
     let parser = Parser::new();
-    let mut code_gen = CodeGen::new();
+    let code_gen = CodeGen::new();
     let parsed = parser.parse("mov $12 r1").unwrap();
 
     assert_eq!(

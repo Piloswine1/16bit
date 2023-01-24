@@ -68,10 +68,15 @@ impl Parser {
     pub fn parse(&self, input: &str) -> ParseRes {
         let mut commands: Vec<ASMCommand> = Vec::new();
         for line in input.lines() {
-            let (cmd, rest_line) = line.split_once(" ").unwrap_or(("", ""));
-            match cmd {
+            let prepared_line = line.trim();
+            println!("Parsing: {}", prepared_line);
+            let (cmd, rest_line) = prepared_line.split_once(" ").unwrap_or((prepared_line, ""));
+            match cmd.to_lowercase().as_str() {
                 "mov" => {
                     commands.push(self.parse_mov(rest_line)?);
+                },
+                "hlt" => {
+                    commands.push(ASMCommand::Hlt);
                 }
                 "" => return Err(ParseErr::EmptyInstruction),
                 _ => return Err(ParseErr::UnsupportedInstruction(line.to_owned())),
