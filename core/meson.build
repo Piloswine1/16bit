@@ -5,7 +5,9 @@ project(
         'optimization=3',
         'cpp_std=c++2a',
         'warning_level=3',
-        'werror=true'
+        'werror=true',
+        'prefer_static=true',
+        'default_library=static'
     ])
 
 main_incdir = include_directories('src')
@@ -18,9 +20,11 @@ src = files([
   'src/devices/screendevice.cpp'
 ])
 
-fmt = subproject('fmt').get_variable('fmt_dep')
-plog = subproject('sergiusthebest-plog').get_variable('plog_dep')
-argparse = subproject('argparse').get_variable('argparse_dep')
+subproj_opts = 'default_library=static'
+
+fmt = subproject('fmt', default_options: subproj_opts).get_variable('fmt_dep')
+plog = subproject('sergiusthebest-plog', default_options: subproj_opts).get_variable('plog_dep')
+argparse = subproject('argparse', default_options: subproj_opts).get_variable('argparse_dep')
 
 deps = [fmt, plog, argparse]
 

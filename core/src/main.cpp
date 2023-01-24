@@ -1,11 +1,12 @@
 #include <fmt/core.h>
 #include <plog/Appenders/ColorConsoleAppender.h>
+#include <plog/Formatters/MessageOnlyFormatter.h>
 #include <plog/Init.h>
 #include <plog/Log.h>
 #include <plog/Severity.h>
 #include <argparse/argparse.hpp>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 
 #include "cpu/cpu.hpp"
 #include "cpu/instructions.hpp"
@@ -13,10 +14,22 @@
 #include "memory/memorymapper.hpp"
 #include "src/utils/macros.hpp"
 
-static plog::ColorConsoleAppender<plog::TxtFormatter>
+static plog::ColorConsoleAppender<plog::MessageOnlyFormatter>
 	colorConsoleAppender;
 
 static const auto MEM_SIZE = 256 * 256;
+
+template <typename T>
+std::optional<T> parse_to(const std::string_view& input) {
+	int out;
+	const std::from_chars_result result =
+		std::from_chars(input.data(), input.data() + input.size(), out);
+	if (result.ec == std::errc::invalid_argument ||
+		result.ec == std::errc::result_out_of_range) {
+		return std::nullopt;
+	}
+	return out;
+}
 
 void run_debug(CPU::CPU& cpu) {
 	std::string prevCmd;
@@ -26,10 +39,27 @@ void run_debug(CPU::CPU& cpu) {
 		}
 
 		if (line.starts_with("n")) {
-			cpu.step();
+			const auto hlt = cpu.step();
+			LOGD << "HLT instruction accured";
+			if (hlt)
+				return;
+
 			cpu.debug();
 			cpu.viewMemoryAt(*cpu.getRegister("ip"));
-			cpu.viewMemoryAt(0x0100);
+			cpu.viewMemoryAt(0x0000);
+		}
+		if (line.starts_with("r")) {
+			cpu.run();
+		}
+		if (line.starts_with("d")) {
+			cpu.debug();
+		}
+		if (line.starts_with("p")) {
+			std::string_view view{line};
+			view.remove_prefix(2);
+			const auto pos = parse_to<uint16_t>(view);
+			if (pos)
+				cpu.viewMemoryAt(*pos);
 		}
 		if (line.starts_with("q")) {
 			break;
@@ -45,9 +75,10 @@ int main(int argc, char** argv) {
 
 	program.add_argument("file").help("mem file to execute");
 
-	program.add_argument("-d", "--debug")
+	program.add_argument("-d")
 		.help("runs vm in debug mode")
 		.default_value(false)
+		.implicit_value(true)
 		.nargs(0);
 
 	program.add_description("16 bit virtual machine");
@@ -59,7 +90,10 @@ int main(int argc, char** argv) {
 		std::cerr << program;
 		std::exit(1);
 	}
-	LOGI << program.get<std::string>("file");
+
+	LOGI << "Params: "
+		 << fmt::format("\nfile: {}", program.get<std::string>("file"))
+		 << fmt::format("\ndebug: {}", program.get<bool>("-d"));
 
 	const auto file_name = program.get<std::string>("file");
 
@@ -74,9 +108,13 @@ int main(int argc, char** argv) {
 	}
 
 	file.seekg(0, std::ios::end);
-	if (file.tellg() > MEM_SIZE) {
+	const auto fileSize = file.tellg();
+	if (fileSize > MEM_SIZE) {
 		LOGF << "Not enough mem to fit all instructions";
 		return 1;
+	}
+	if (program.get<bool>("-d")) {
+		LOGD << fmt::format("File size: {}", fileSize);
 	}
 	file.seekg(0, std::ios::beg);
 
@@ -96,7 +134,7 @@ int main(int argc, char** argv) {
 
 	auto cpu = CPU::CPU(std::move(MM));
 
-	if (program["--debug"] == true) {
+	if (program.get<bool>("-d")) {
 		run_debug(cpu);
 	} else {
 		cpu.run();
