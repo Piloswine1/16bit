@@ -10,7 +10,6 @@
 
 static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
 
-// TODO: somewhat make it
 class MockScreenDevice final : public IMemoryMappedDevice {
 public:
 	inline static int count;
