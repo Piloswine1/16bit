@@ -12,54 +12,35 @@ pub enum Regs {
     R8 = 9,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum LVal {
-    Mem(u16),
-    Hex(u16),
-    Reg(Regs),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum RVal {
-    Reg(Regs),
-    Mem(u16),
-}
-
 #[derive(Debug, PartialEq)]
-pub enum ASMCommand {
-    Mov(LVal, RVal),
-    Hlt,
+pub enum Token {
+    Whitespace,
+    Comma,
+    Colon,
+    // logic
+    Or,
+    And,
+    Neg,
+    // arithm
+    Plus,
+    Star,
+    Minus,
+    // vars
+    Lit(u16),
+    Mem(u16),
+    Reg(Regs),
+    // params
+    OpenParen,
+    CloseParen,
+    OpenBracket,
+    CloseBracket,
+    // ident
+    Ident(String),
+    // invalid
+    InvalidIdent,
+    EOF,
+    EOL,
 }
 
 #[derive(Debug)]
-pub enum ArgType {
-    Hex(u16),
-    Mem(u16),
-    Reg(Regs),
-}
-
-impl From<ArgType> for LVal {
-    fn from(value: ArgType) -> Self {
-        match value {
-            ArgType::Hex(val) => LVal::Hex(val),
-            ArgType::Mem(val) => LVal::Mem(val),
-            ArgType::Reg(reg) => LVal::Reg(reg),
-        }
-    }
-}
-
-impl TryFrom<ArgType> for RVal {
-    type Error = String;
-
-    fn try_from(value: ArgType) -> Result<Self, Self::Error> {
-        match value {
-            ArgType::Hex(_) => Err("Not suted for rval".to_owned()),
-            ArgType::Mem(val) => Ok(RVal::Mem(val)),
-            ArgType::Reg(reg) => Ok(RVal::Reg(reg)),
-        }
-    }
-}
-
-pub fn parse_u16(val: &u16) -> [u8; 2] {
-    [(val >> 8) as u8, (val & 0x00ff) as u8]
-}
+pub enum AsmAst {}
