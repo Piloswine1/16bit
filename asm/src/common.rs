@@ -13,10 +13,11 @@ pub enum Regs {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Token {
+pub enum TokenEnum {
     Whitespace,
     Comma,
     Colon,
+    Semicolon,
     // logic
     Or,
     And,
@@ -34,13 +35,11 @@ pub enum Token {
     CloseParen,
     OpenBracket,
     CloseBracket,
+    Question,
     // ident
     Ident(String),
     // invalid
     InvalidIdent,
     EOF,
-    EOL,
+    NewLine,
 }
-
-#[derive(Debug)]
-pub enum AsmAst {}

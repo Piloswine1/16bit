@@ -1,11 +1,41 @@
+use core::fmt;
 use std::{iter::Peekable, str::Chars};
 
-use crate::common::Token;
+use crate::common::TokenEnum;
+
+#[derive(Debug, PartialEq)]
+pub struct Token {
+    pub kind: TokenEnum,
+    pub len: u32,
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            TokenEnum::Ident(ident) => write!(f, "{}", ident),
+            TokenEnum::Lit(lit) => write!(f, "{}", lit),
+            TokenEnum::Mem(mem) => write!(f, "&{}", mem),
+            TokenEnum::Reg(reg) => write!(f, "{:?}", reg),
+            TokenEnum::Comma => write!(f, ","),
+            TokenEnum::Plus => write!(f, "+"),
+            TokenEnum::Minus => write!(f, "-"),
+            TokenEnum::Star => write!(f, "*"),
+            TokenEnum::Question => write!(f, "?"),
+            TokenEnum::Colon => write!(f, ":"),
+            _ => return Err(fmt::Error),
+        }
+    }
+}
+
+impl Token {
+    pub fn new(kind: TokenEnum, len: u32) -> Self {
+        Self { kind, len }
+    }
+}
 
 #[derive(Debug)]
-pub struct Lexer<'a> {
-    _input: String,
-    cursor: Peekable<Chars<'a>>,
+pub struct Cursor<'a> {
+    pub cursor: Peekable<Chars<'a>>,
 }
 
 #[derive(Debug)]
@@ -20,51 +50,52 @@ pub fn is_valid_id_continue(c: &char) -> bool {
     c.is_alphabetic() || c.is_numeric()
 }
 
-impl<'a> Lexer<'a> {
+pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
+    let mut lexer = Cursor::new(input);
+    std::iter::from_fn(move || {
+        let token = lexer.parse_token();
+        // println!("parsed: {:?}", token);
+
+        if token != Token::new(TokenEnum::EOF, 0) {
+            Some(token)
+        } else {
+            None
+        }
+    })
+}
+
+pub fn tokenize_expr(input: &str) -> Peekable<impl Iterator<Item = Token> + '_>  {
+    tokenize(input).filter(|x| x.kind != TokenEnum::Whitespace && x.kind != TokenEnum::NewLine).peekable()
+}
+
+impl<'a> Cursor<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
-            _input: input.to_string(),
             cursor: input.chars().peekable(),
         }
-    }
-
-    pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
-        let mut lines = input.lines();
-        let mut lexer = Lexer::new(lines.next().unwrap());
-        std::iter::from_fn(move || {
-            let token = lexer.parse_token();
-            // println!("parsed: {:?}", token);
-
-            if token != Token::EOF {
-                Some(token)
-            } else if let Some(line) = lines.next() {
-                lexer = Lexer::new(line);
-                Some(Token::EOL)
-            } else {
-                None
-            }
-        })
     }
 
     // TODO: think of reg lexing
     pub fn parse_token(&mut self) -> Token {
         let first_char = self.cursor.next();
-        println!("to parse: {:?}", first_char);
+        // println!("to parse: {:?}", first_char);
 
         match first_char {
-            Some(x) if x.is_whitespace() => self.eat_whitespace(),
             Some('&') => self.parse_mem(),
             Some('$') => self.parse_lit(),
-            Some(',') => Token::Comma,
-            Some('(') => Token::OpenParen,
-            Some(')') => Token::CloseParen,
-            Some('[') => Token::OpenBracket,
-            Some(']') => Token::CloseBracket,
-            Some('!') => Token::Neg,
-            Some(':') => Token::Colon,
-            Some('+') => Token::Plus,
-            Some('*') => Token::Star,
-            Some('-') => Token::Minus,
+            Some(',') => Token::new(TokenEnum::Comma, 1),
+            Some('(') => Token::new(TokenEnum::OpenParen, 1),
+            Some(')') => Token::new(TokenEnum::CloseParen, 1),
+            Some('[') => Token::new(TokenEnum::OpenBracket, 1),
+            Some(']') => Token::new(TokenEnum::CloseBracket, 1),
+            Some('!') => Token::new(TokenEnum::Neg, 1),
+            Some(':') => Token::new(TokenEnum::Colon, 1),
+            Some('?') => Token::new(TokenEnum::Question, 1),
+            Some(';') => Token::new(TokenEnum::Semicolon, 1),
+            Some('+') => Token::new(TokenEnum::Plus, 1),
+            Some('*') => Token::new(TokenEnum::Star, 1),
+            Some('-') => Token::new(TokenEnum::Minus, 1),
+            Some('\n') => self.parse_newline(),
             // Some('r') => match self.cursor.next() {
             //     Some('1') => Token::Reg(crate::common::Regs::R1),
             //     Some('2') => Token::Reg(crate::common::Regs::R2),
@@ -78,26 +109,24 @@ impl<'a> Lexer<'a> {
             //     // XXX: can be r0 unvalid register, mb can use as variable
             //     _ => unimplemented!(),
             // },
+            Some(x) if x.is_whitespace() => self.eat_whitespace(),
             Some(c) if c.is_alphabetic() => self.parse_ident(c),
-            None => Token::EOF,
+            None => Token::new(TokenEnum::EOF, 0),
             // XXX: dunno what can happen
             _ => unimplemented!(),
         }
     }
 
-    /// Implicitly we ate 'r'
-    // pub fn try_parse_reg(&mut self, first_char: char) -> Token {
-    //     match self.cursor.peek() {
-    //         Some('_') => {
-    //             self.cursor.next();
-    //
-    //         },
-    //         None => Token::Ident("r".into()),
-    //         Some(_) => self.parse_ident(first_char),
-    //     }
-    // }
+    pub fn parse_newline(&mut self) -> Token {
+        let mut len = 1;
+        if self.cursor.peek() == Some(&'\t') {
+            self.cursor.next();
+            len += 1;
+        }
+        Token::new(TokenEnum::NewLine, len)
+    }
 
-    pub fn parse_hex(&mut self) -> Result<u16> {
+    pub fn parse_hex(&mut self) -> Result<(u16, u32)> {
         let mut hex = String::new();
         while let Some(x) = self.cursor.peek() {
             if x.is_digit(16) {
@@ -106,32 +135,34 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        Ok(hex.parse::<u16>().unwrap())
+        Ok((hex.parse::<u16>().unwrap(), hex.len() as u32))
     }
 
     fn parse_mem(&mut self) -> Token {
         match self.parse_hex() {
-            Ok(x) => Token::Mem(x),
-            Err(_) => Token::InvalidIdent,
+            Ok((x, size)) => Token::new(TokenEnum::Mem(x), size + 1),
+            Err(_) => Token::new(TokenEnum::InvalidIdent, 0),
         }
     }
 
     fn parse_lit(&mut self) -> Token {
         match self.parse_hex() {
-            Ok(x) => Token::Lit(x),
-            Err(_) => Token::InvalidIdent,
+            Ok((x, size)) => Token::new(TokenEnum::Lit(x), size + 1),
+            Err(_) => Token::new(TokenEnum::InvalidIdent, 0),
         }
     }
 
     fn eat_whitespace(&mut self) -> Token {
+        let mut len = 1;
         while let Some(c) = self.cursor.peek() {
             if c.is_whitespace() {
                 self.cursor.next();
+                len += 1;
             } else {
                 break;
             }
         }
-        Token::Whitespace
+        Token::new(TokenEnum::Whitespace, len)
     }
 
     fn parse_ident(&mut self, first_char: char) -> Token {
@@ -144,45 +175,73 @@ impl<'a> Lexer<'a> {
             }
             ident.push(self.cursor.next().unwrap());
         }
-        Token::Ident(ident)
+        let len = ident.len() as u32;
+        Token::new(TokenEnum::Ident(ident), len)
     }
 }
 
 #[test]
 fn parse_mov() {
-    let tokens: Vec<_> = Lexer::tokenize("mov $10, r2").collect();
+    let tokens: Vec<_> = tokenize("mov $10, r2").collect();
     assert_eq!(
         tokens,
         vec![
-            Token::Ident("mov".into()),
-            Token::Whitespace,
-            Token::Lit(10),
-            Token::Comma,
-            Token::Whitespace,
-            Token::Ident("r2".into()),
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Lit(10), 3),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("r2".into()), 2),
         ]
     );
 }
 
 #[test]
 fn parse_multiline() {
-    let tokens: Vec<_> = Lexer::tokenize("mov $10, r2\nmov &10, acc").collect();
+    let tokens: Vec<_> = tokenize("mov $10, r2\nmov &10, acc").collect();
     assert_eq!(
         tokens,
         vec![
-            Token::Ident("mov".into()),
-            Token::Whitespace,
-            Token::Lit(10),
-            Token::Comma,
-            Token::Whitespace,
-            Token::Ident("r2".into()),
-            Token::EOL,
-            Token::Ident("mov".into()),
-            Token::Whitespace,
-            Token::Mem(10),
-            Token::Comma,
-            Token::Whitespace,
-            Token::Ident("acc".into()),
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Lit(10), 3),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("r2".into()), 2),
+            Token::new(TokenEnum::NewLine, 1),
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Mem(10), 3),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("acc".into()), 3),
         ]
     );
+}
+
+#[test]
+fn parse_expression() {
+    let tokens: Vec<_> = tokenize("mov [&1 + !var - $10], acc").collect();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::OpenBracket, 1),
+            Token::new(TokenEnum::Mem(1), 2),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Plus, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Neg, 1),
+            Token::new(TokenEnum::Ident("var".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Minus, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Lit(10), 3),
+            Token::new(TokenEnum::CloseBracket, 1),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("acc".into()), 3),
+        ]
+    )
 }
