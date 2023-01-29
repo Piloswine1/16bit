@@ -1,9 +1,9 @@
+pub mod ast;
 pub mod codegen;
 pub mod common;
 pub mod instructions;
-pub mod parse;
 pub mod lexer;
-pub mod ast;
+pub mod parse;
 
 use std::{
     fs::File,

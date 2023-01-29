@@ -3,7 +3,7 @@ use std::{iter::Peekable, str::Chars};
 
 use crate::common::TokenEnum;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenEnum,
     pub len: u32,
@@ -11,25 +11,25 @@ pub struct Token {
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            TokenEnum::Ident(ident) => write!(f, "{}", ident),
-            TokenEnum::Lit(lit) => write!(f, "{}", lit),
-            TokenEnum::Mem(mem) => write!(f, "&{}", mem),
-            TokenEnum::Reg(reg) => write!(f, "{:?}", reg),
-            TokenEnum::Comma => write!(f, ","),
-            TokenEnum::Plus => write!(f, "+"),
-            TokenEnum::Minus => write!(f, "-"),
-            TokenEnum::Star => write!(f, "*"),
-            TokenEnum::Question => write!(f, "?"),
-            TokenEnum::Colon => write!(f, ":"),
-            _ => return Err(fmt::Error),
-        }
+        self.kind.fmt(f)
     }
 }
 
 impl Token {
     pub fn new(kind: TokenEnum, len: u32) -> Self {
         Self { kind, len }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TokenWithSpan {
+    pub kind: TokenEnum,
+    pub pos: u32,
+}
+
+impl TokenWithSpan {
+    pub fn new(kind: TokenEnum, pos: u32) -> Self {
+        Self { kind, pos }
     }
 }
 
@@ -50,13 +50,27 @@ pub fn is_valid_id_continue(c: &char) -> bool {
     c.is_alphabetic() || c.is_numeric()
 }
 
-pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
+pub fn tokenize(input: &str) -> impl Iterator<Item = TokenEnum> + '_ {
     let mut lexer = Cursor::new(input);
     std::iter::from_fn(move || {
         let token = lexer.parse_token();
         // println!("parsed: {:?}", token);
 
-        if token != Token::new(TokenEnum::EOF, 0) {
+        if token.kind != TokenEnum::EOF {
+            Some(token.kind)
+        } else {
+            None
+        }
+    })
+}
+
+pub fn tokenize_old(input: &str) -> impl Iterator<Item = Token> + '_ {
+    let mut lexer = Cursor::new(input);
+    std::iter::from_fn(move || {
+        let token = lexer.parse_token();
+        // println!("parsed: {:?}", token);
+
+        if token.kind != TokenEnum::EOF {
             Some(token)
         } else {
             None
@@ -64,8 +78,10 @@ pub fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
     })
 }
 
-pub fn tokenize_expr(input: &str) -> Peekable<impl Iterator<Item = Token> + '_>  {
-    tokenize(input).filter(|x| x.kind != TokenEnum::Whitespace && x.kind != TokenEnum::NewLine).peekable()
+pub fn tokenize_expr(input: &str) -> Peekable<impl Iterator<Item = Token> + '_> {
+    tokenize_old(input)
+        .filter(|x| x.kind != TokenEnum::Whitespace && x.kind != TokenEnum::NewLine)
+        .peekable()
 }
 
 impl<'a> Cursor<'a> {
@@ -129,13 +145,21 @@ impl<'a> Cursor<'a> {
     pub fn parse_hex(&mut self) -> Result<(u16, u32)> {
         let mut hex = String::new();
         while let Some(x) = self.cursor.peek() {
-            if x.is_digit(16) {
+            if x.is_digit(16) || *x == 'x' {
                 hex.push(self.cursor.next().unwrap());
             } else {
                 break;
             }
         }
-        Ok((hex.parse::<u16>().unwrap(), hex.len() as u32))
+        if hex.starts_with("0x") {
+            let without_prefix = hex.trim_start_matches("0x");
+            Ok((
+                u16::from_str_radix(without_prefix, 16).unwrap(),
+                hex.len() as u32,
+            ))
+        } else {
+            Ok((hex.parse::<u16>().unwrap(), hex.len() as u32))
+        }
     }
 
     fn parse_mem(&mut self) -> Token {
@@ -182,7 +206,7 @@ impl<'a> Cursor<'a> {
 
 #[test]
 fn parse_mov() {
-    let tokens: Vec<_> = tokenize("mov $10, r2").collect();
+    let tokens: Vec<_> = tokenize_old("mov $10, r2").collect();
     assert_eq!(
         tokens,
         vec![
@@ -198,7 +222,7 @@ fn parse_mov() {
 
 #[test]
 fn parse_multiline() {
-    let tokens: Vec<_> = tokenize("mov $10, r2\nmov &10, acc").collect();
+    let tokens: Vec<_> = tokenize_old("mov $10, r2\nmov &10, acc").collect();
     assert_eq!(
         tokens,
         vec![
@@ -221,7 +245,7 @@ fn parse_multiline() {
 
 #[test]
 fn parse_expression() {
-    let tokens: Vec<_> = tokenize("mov [&1 + !var - $10], acc").collect();
+    let tokens: Vec<_> = tokenize_old("mov [&1 + !var - $10], acc").collect();
     assert_eq!(
         tokens,
         vec![

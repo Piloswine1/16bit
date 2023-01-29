@@ -1,3 +1,5 @@
+use core::fmt;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum Regs {
@@ -12,7 +14,7 @@ pub enum Regs {
     R8 = 9,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenEnum {
     Whitespace,
     Comma,
@@ -42,4 +44,22 @@ pub enum TokenEnum {
     InvalidIdent,
     EOF,
     NewLine,
+}
+
+impl fmt::Display for TokenEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenEnum::Ident(ident) => write!(f, "{}", ident),
+            TokenEnum::Lit(lit) => write!(f, "{}", lit),
+            TokenEnum::Mem(mem) => write!(f, "&{}", mem),
+            TokenEnum::Reg(reg) => write!(f, "{:?}", reg),
+            TokenEnum::Comma => write!(f, ","),
+            TokenEnum::Plus => write!(f, "+"),
+            TokenEnum::Minus => write!(f, "-"),
+            TokenEnum::Star => write!(f, "*"),
+            TokenEnum::Question => write!(f, "?"),
+            TokenEnum::Colon => write!(f, ":"),
+            _ => return Err(fmt::Error),
+        }
+    }
 }
