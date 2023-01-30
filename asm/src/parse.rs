@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 
 use crate::{
-    ast::{Expr, S},
+    ast::{Expr, ExprArgs, ExprKind, S},
     common::TokenEnum,
     lexer::{tokenize_old, Token},
 };
@@ -14,17 +14,17 @@ pub struct Parser {
 #[derive(Debug, Clone)]
 pub enum ParserError {
     EmptyExpr,
-    UnknownExpr(String),
+    UnknownExpr(String, u32),
 }
 
 type ParseRes<T> = Result<T, ParserError>;
 
-impl Parser {
+impl<'a> Parser {
     pub fn new() -> Self {
         Self { line: 0 }
     }
 
-    pub fn parse<'a>(&mut self, input: &'a str) -> ParseRes<Vec<Expr>> {
+    pub fn parse(&mut self, input: &'a str) -> ParseRes<Vec<Expr>> {
         let mut lexer = tokenize_old(input)
             .filter(|x| x.kind != TokenEnum::Whitespace)
             .peekable();
@@ -33,172 +33,171 @@ impl Parser {
         let mut exprs: Vec<Expr> = Vec::new();
 
         while let Some(tkn) = lexer.next() {
-            let expr = match tkn.kind {
-                TokenEnum::Ident(ident) => self.parse_ident(&mut lexer, ident.as_str()),
+            let expr = match &tkn.kind {
+                TokenEnum::Ident(_) => self.parse_ident(&mut lexer, &tkn)?,
                 TokenEnum::NewLine => {
                     self.line += 1;
                     continue;
                 }
-                _ => {
-                    let line: Vec<_> = lexer
-                        .by_ref()
-                        .take_while(|x| x.kind != TokenEnum::NewLine)
-                        .map(|x| x.kind.to_string())
-                        .collect();
-
-                    Expr::Unimplemended(
-                        format!(
-                            "Expr: {:?} on line {:?} currently unimplemented",
-                            tkn,
-                            line.join(" ")
-                        ),
-                        self.line,
-                    )
-                }
+                _ => return Err(self.collect_error_on_line(&mut lexer, &tkn)),
             };
             exprs.push(expr);
         }
         Ok(exprs)
     }
 
-    pub fn parse_ident(
+    pub fn collect_error_on_line(
         &self,
         lexer: &mut Peekable<impl Iterator<Item = Token>>,
-        ident: &str,
-    ) -> Expr {
+        tkn: &Token,
+    ) -> ParserError {
+        let line: Vec<_> = lexer
+            .by_ref()
+            .take_while(|x| x.kind != TokenEnum::NewLine)
+            .map(|x| x.kind.to_string())
+            .collect();
+
+        ParserError::UnknownExpr(
+            format!(
+                "Expr: {:?} on line {:?} currently unimplemented",
+                tkn,
+                line.join(" ")
+            ),
+            self.line,
+        )
+    }
+
+    pub fn try_label(
+        &self,
+        lexer: &mut Peekable<impl Iterator<Item = Token>>,
+        ident: &Token,
+    ) -> Option<Expr> {
         match lexer.peek() {
             Some(Token {
                 kind: TokenEnum::Comma,
                 ..
             }) => {
                 lexer.next();
-                return Expr::Label(ident.into());
+                Some(Expr::new(ExprKind::Label, ExprArgs::Single(ident.clone())))
             }
-            None => return Expr::WrongExpr("False expression".into(), self.line),
-            _ => (),
+            None => {
+                let msg = format!(
+                    "{:?}",
+                    ParserError::UnknownExpr("False expression".into(), self.line)
+                );
+                panic!("{}", msg);
+            }
+            _ => None,
+        }
+    }
+
+    pub fn parse_ident(
+        &self,
+        lexer: &mut Peekable<impl Iterator<Item = Token>>,
+        ident: &Token,
+    ) -> ParseRes<Expr> {
+        let ident_into = match &ident.kind {
+            TokenEnum::Ident(ident) => ident.as_str(),
+            _ => unreachable!(),
         };
+
+        if let Some(expr) = self.try_label(lexer, ident) {
+            return Ok(expr);
+        }
 
         // Pass label parsing instructions
-        let expr = match ident {
+        match ident_into {
             "mov" => self.parse_mov(lexer),
-            "add" => self.parse_add(lexer),
-            "call" => self.parse_call(lexer),
-            "push" => self.parse_push(lexer),
-            "pop" => self.parse_pop(lexer),
-            "jne" => self.parse_jne(lexer),
-            "jeq" => self.parse_jeq(lexer),
-            // TODO: jlt/jgt
-            "ret" => Ok(Expr::Ret),
-            "hlt" => Ok(Expr::HLT),
+            "add" => self.parse_double_args(lexer, ExprKind::Add),
+            "sub" => self.parse_double_args(lexer, ExprKind::Sub),
+            "mul" => self.parse_double_args(lexer, ExprKind::Mul),
+            "and" => self.parse_double_args(lexer, ExprKind::And),
+            "or" => self.parse_double_args(lexer, ExprKind::Or),
+            "xor" => self.parse_double_args(lexer, ExprKind::Xor),
+            "call" => self.parse_single_args(lexer, ExprKind::Call),
+            "push" => self.parse_single_args(lexer, ExprKind::Push),
+            "pop" => self.parse_single_args(lexer, ExprKind::Pop),
+            "not" => self.parse_single_args(lexer, ExprKind::Not),
+            "inc" => self.parse_single_args(lexer, ExprKind::Inc),
+            "dec" => self.parse_single_args(lexer, ExprKind::Dec),
+            "jne" => self.parse_double_args(lexer, ExprKind::JmpNotEQ),
+            "jeq" => self.parse_double_args(lexer, ExprKind::JmpEQ),
+            "jlt" => self.parse_double_args(lexer, ExprKind::JmpLT),
+            "jgt" => self.parse_double_args(lexer, ExprKind::JmpGT),
+            "ret" => Ok(Expr::new(ExprKind::Ret, ExprArgs::NoArgs)),
+            "hlt" => Ok(Expr::new(ExprKind::HLT, ExprArgs::NoArgs)),
             _ => unimplemented!(),
-        };
-
-        match expr {
-            Err(ParserError::UnknownExpr(msg)) => Expr::WrongExpr(msg, self.line),
-            Err(err) => Expr::UnknownExpr(format!("{:?}", err), self.line),
-            Ok(expr) => expr,
         }
     }
 
     pub fn parse_mov(&self, lexer: &mut Peekable<impl Iterator<Item = Token>>) -> ParseRes<Expr> {
-        let mov_error = ParserError::UnknownExpr("Mov usage: mov <expr>, <reg/mem>".into());
+        let mov_error =
+            ParserError::UnknownExpr("Mov usage: mov <expr>, <reg/mem>".into(), self.line);
         let mov_error_long = ParserError::UnknownExpr(
             "Mov lit offset reg usage: mov <lit>, <reg/mem>, <reg/mem>".into(),
+            self.line,
         );
 
         let res = match lexer.peek() {
-            Some(tkn) => match tkn.kind {
-                TokenEnum::OpenBracket => {
-                    lexer.next();
-                    let mut expr = lexer
-                        .take_while(|x| x.kind != TokenEnum::CloseBracket)
-                        .into_iter()
-                        .peekable();
+            Some(Token {
+                kind: TokenEnum::OpenBracket,
+                ..
+            }) => {
+                lexer.next();
+                let mut expr = lexer
+                    .take_while(|x| x.kind != TokenEnum::CloseBracket)
+                    .into_iter()
+                    .peekable();
 
-                    let lhs = Self::expr_bp(&mut expr, 0)?;
-                    assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
-                    let rhs = lexer.next().ok_or(mov_error)?;
+                let lhs = Self::expr_bp(&mut expr, 0)?;
+                assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
+                let rhs = lexer.next().ok_or(mov_error)?;
 
-                    Expr::MovComplex(lhs, rhs)
-                }
-                _ => {
-                    // TODO: validate
-                    let lhs = lexer.next().unwrap();
-                    assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
-                    // TODO: validate is mem or reg
-                    let maybe_mhs = lexer.next().ok_or(mov_error)?;
-                    if let Some(Token {
-                        kind: TokenEnum::Comma,
-                        ..
-                    }) = lexer.peek()
-                    {
-                        lexer.next();
-                        let rhs = lexer.next().ok_or(mov_error_long)?;
-                        Expr::MovLitOff(lhs, maybe_mhs, rhs)
-                    } else {
-                        Expr::Mov(lhs, maybe_mhs)
-                    }
-                }
-            },
+                Expr::new(ExprKind::Mov, ExprArgs::Complex(lhs, rhs))
+            }
             None => return Err(mov_error),
+            _ => {
+                // TODO: validate
+                let lhs = lexer.next().unwrap();
+                assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
+                // TODO: validate is mem or reg
+                let maybe_mhs = lexer.next().ok_or(mov_error)?;
+                if let Some(Token {
+                    kind: TokenEnum::Comma,
+                    ..
+                }) = lexer.peek()
+                {
+                    lexer.next();
+                    let rhs = lexer.next().ok_or(mov_error_long)?;
+                    Expr::new(ExprKind::Mov, ExprArgs::Triple(lhs, maybe_mhs, rhs))
+                } else {
+                    Expr::new(ExprKind::Mov, ExprArgs::Double(lhs, maybe_mhs))
+                }
+            }
         };
         Ok(res)
     }
 
-    pub fn parse_add(&self, lexer: &mut Peekable<impl Iterator<Item = Token>>) -> ParseRes<Expr> {
-        // let add_error = ParserError::UnknownExpr("Add usage: add <expr>, <reg/mem>".into());
-
+    pub fn parse_double_args(
+        &self,
+        lexer: &mut Peekable<impl Iterator<Item = Token>>,
+        kind: ExprKind,
+    ) -> ParseRes<Expr> {
         let lhs = lexer.next().unwrap();
         assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
         let rhs = lexer.next().unwrap();
 
-        Ok(Expr::Add(lhs, rhs))
+        Ok(Expr::new(kind, ExprArgs::Double(lhs, rhs)))
     }
 
-    fn parse_call(&self, lexer: &mut Peekable<impl Iterator<Item = Token>>) -> ParseRes<Expr> {
-        let lhs = lexer.next().unwrap();
-
-        Ok(Expr::Call(lhs))
-    }
-
-    fn parse_push(
+    pub fn parse_single_args(
         &self,
         lexer: &mut Peekable<impl Iterator<Item = Token>>,
-    ) -> Result<Expr, ParserError> {
+        kind: ExprKind,
+    ) -> ParseRes<Expr> {
         let lhs = lexer.next().unwrap();
 
-        Ok(Expr::Push(lhs))
-    }
-
-    fn parse_pop(
-        &self,
-        lexer: &mut Peekable<impl Iterator<Item = Token>>,
-    ) -> Result<Expr, ParserError> {
-        let lhs = lexer.next().unwrap();
-
-        Ok(Expr::Pop(lhs))
-    }
-
-    fn parse_jne(
-        &self,
-        lexer: &mut Peekable<impl Iterator<Item = Token>>,
-    ) -> Result<Expr, ParserError> {
-        let lhs = lexer.next().unwrap();
-        assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
-        let rhs = lexer.next().unwrap();
-
-        Ok(Expr::JmpNotEQ(lhs, rhs))
-    }
-
-    fn parse_jeq(
-        &self,
-        lexer: &mut Peekable<impl Iterator<Item = Token>>,
-    ) -> Result<Expr, ParserError> {
-        let lhs = lexer.next().unwrap();
-        assert_eq!(lexer.next().unwrap().kind, TokenEnum::Comma);
-        let rhs = lexer.next().unwrap();
-
-        Ok(Expr::JmpEQ(lhs, rhs))
+        Ok(Expr::new(kind, ExprArgs::Single(lhs)))
     }
 
     #[allow(dead_code)]
@@ -216,7 +215,7 @@ impl Parser {
                     lhs
                 }
                 TokenEnum::Mem(_) | TokenEnum::Lit(_) | TokenEnum::Ident(_) => S::Atom(token),
-                _ => return Err(ParserError::UnknownExpr(format!("{:?}", token))),
+                _ => return Err(ParserError::UnknownExpr(format!("{:?}", token), 0)),
             },
         };
 
@@ -317,134 +316,74 @@ fn parse_expr() {
     let parsed = parser.parse("mov $1, $2").unwrap();
     assert_eq!(
         parsed,
-        vec![Expr::Mov(
-            Token {
-                kind: TokenEnum::Lit(1),
-                len: 2
-            },
-            Token {
-                kind: TokenEnum::Lit(2),
-                len: 2
-            }
-        )]
-    );
-
-    let parsed = parser.parse("mov $1, &2, $2").unwrap();
-    assert_eq!(
-        parsed,
-        vec![Expr::MovLitOff(
-            Token {
-                kind: TokenEnum::Lit(1),
-                len: 2
-            },
-            Token {
-                kind: TokenEnum::Mem(2),
-                len: 2
-            },
-            Token {
-                kind: TokenEnum::Lit(2),
-                len: 2
-            }
+        vec![Expr::new(
+            ExprKind::Mov,
+            ExprArgs::Double(
+                Token::new(TokenEnum::Lit(1), 2),
+                Token::new(TokenEnum::Lit(2), 2)
+            )
         )]
     );
 
     let parsed = parser
         .parse(
             "mov $1, r1
-            add $1, r1",
+            add $0x000f, r1
+            not r1",
         )
         .unwrap();
     assert_eq!(
         parsed,
         vec![
-            Expr::Mov(
-                Token {
-                    kind: TokenEnum::Lit(1),
-                    len: 2
-                },
-                Token {
-                    kind: TokenEnum::Ident("r1".into()),
-                    len: 2
-                }
+            Expr::new(
+                ExprKind::Mov,
+                ExprArgs::Double(
+                    Token::new(TokenEnum::Lit(1), 2),
+                    Token::new(TokenEnum::Ident("r1".into()), 2)
+                )
             ),
-            Expr::Add(
-                Token {
-                    kind: TokenEnum::Lit(1),
-                    len: 2
-                },
-                Token {
-                    kind: TokenEnum::Ident("r1".into()),
-                    len: 2
-                }
-            )
+            Expr::new(
+                ExprKind::Add,
+                ExprArgs::Double(
+                    Token::new(TokenEnum::Lit(0x000fu16), 7),
+                    Token::new(TokenEnum::Ident("r1".into()), 2)
+                )
+            ),
+            Expr::new(
+                ExprKind::Not,
+                ExprArgs::Single(Token::new(TokenEnum::Ident("r1".into()), 2))
+            ),
         ]
     );
 
-    let parsed = parser.parse("mov [$1 + &2 * $1], r2").unwrap();
+    let parsed = parser.parse("mov $1, $1, r1").unwrap();
     assert_eq!(
         parsed,
-        vec![Expr::MovComplex(
-            S::Cons(
-                Token {
-                    kind: TokenEnum::Plus,
-                    len: 1
-                },
-                vec![
-                    S::Atom(Token {
-                        kind: TokenEnum::Lit(1),
-                        len: 2
-                    }),
-                    S::Cons(
-                        Token {
-                            kind: TokenEnum::Star,
-                            len: 1
-                        },
-                        vec![
-                            S::Atom(Token {
-                                kind: TokenEnum::Mem(2),
-                                len: 2
-                            }),
-                            S::Atom(Token {
-                                kind: TokenEnum::Lit(1),
-                                len: 2
-                            })
-                        ]
-                    )
-                ]
-            ),
-            Token {
-                kind: TokenEnum::Ident("r2".into()),
-                len: 2
-            }
+        vec![Expr::new(
+            ExprKind::Mov,
+            ExprArgs::Triple(
+                Token::new(TokenEnum::Lit(1), 2),
+                Token::new(TokenEnum::Lit(1), 2),
+                Token::new(TokenEnum::Ident("r1".into()), 2)
+            )
         )]
     );
 
-    let parsed = parser.parse("call $0x000f").unwrap();
+    let parsed = parser.parse("mov [$1 + &2], r1").unwrap();
     assert_eq!(
         parsed,
-        vec![Expr::Call(Token {
-            kind: TokenEnum::Lit(0x000fu16),
-            len: 7
-        })]
-    );
-
-    let parsed = parser
-        .parse(
-            "push $1
-            pop r1",
-        )
-        .unwrap();
-    assert_eq!(
-        parsed,
-        vec![
-            Expr::Push(Token {
-                kind: TokenEnum::Lit(1),
-                len: 2
-            }),
-            Expr::Pop(Token {
-                kind: TokenEnum::Ident("r1".into()),
-                len: 2
-            })
-        ]
+        vec![Expr::new(
+            ExprKind::Mov,
+            ExprArgs::Complex(
+                S::Cons(
+                    Token::new(TokenEnum::Plus, 1),
+                    vec![
+                        S::Atom(Token::new(TokenEnum::Lit(1), 2)),
+                        S::Atom(Token::new(TokenEnum::Mem(2), 2)),
+                    ]
+                ),
+                Token::new(TokenEnum::Ident("r1".into()), 2)
+            )
+        )]
     );
 }

@@ -9,7 +9,7 @@ pub struct Token {
     pub len: u32,
 }
 
-impl fmt::Display for Token {
+impl<'a> fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.kind.fmt(f)
     }
@@ -21,17 +21,17 @@ impl Token {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct TokenWithSpan {
-    pub kind: TokenEnum,
-    pub pos: u32,
-}
+// #[derive(Debug, PartialEq)]
+// pub struct TokenWithSpan {
+//     pub kind: TokenEnum,
+//     pub pos: u32,
+// }
 
-impl TokenWithSpan {
-    pub fn new(kind: TokenEnum, pos: u32) -> Self {
-        Self { kind, pos }
-    }
-}
+// impl TokenWithSpan {
+//     pub fn new(kind: TokenEnum, pos: u32) -> Self {
+//         Self { kind, pos }
+//     }
+// }
 
 #[derive(Debug)]
 pub struct Cursor<'a> {
@@ -200,7 +200,7 @@ impl<'a> Cursor<'a> {
             ident.push(self.cursor.next().unwrap());
         }
         let len = ident.len() as u32;
-        Token::new(TokenEnum::Ident(ident), len)
+        Token::new(TokenEnum::Ident(ident.clone()), len)
     }
 }
 

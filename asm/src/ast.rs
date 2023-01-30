@@ -1,34 +1,55 @@
 use core::fmt;
 
-use crate::{common::Regs, lexer::Token};
+use crate::lexer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Mov(Token, Token),
-    Add(Token, Token),
-    Sub(Token, Token),
-    Mul(Token, Token),
-    Inc(Token),
-    Dec(Token),
-    Not(Token),
-    JmpEQ(Token, Token),
-    JmpNotEQ(Token, Token),
-    JmpGT(Token, Token),
-    JmpLE(Token, Token),
-    Push(Token),
-    Pop(Token),
-    Call(Token),
+pub enum ExprKind {
+    Mov,
+    Add,
+    Sub,
+    Mul,
+    And,
+    Or,
+    Xor,
+    Inc,
+    Dec,
+    Not,
+    JmpEQ,
+    JmpNotEQ,
+    JmpGT,
+    JmpLT,
+    Push,
+    Pop,
+    Call,
     Ret,
     HLT,
 
-    MovComplex(S, Token),
-    MovLitOff(Token, Token, Token),
+    Label,
+    // // XXX: maybe move to typechecker
+    // WrongExpr(String, u32),
+    // UnknownExpr(String, u32),
+    // Unimplemended(String, u32),
+}
 
-    Label(String),
-    // XXX: maybe move to typechecker
-    WrongExpr(String, u32),
-    UnknownExpr(String, u32),
-    Unimplemended(String, u32),
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprArgs {
+    NoArgs,
+    Single(Token),
+    Complex(S, Token),
+    Double(Token, Token),
+    Triple(Token, Token, Token),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Expr {
+    pub kind: ExprKind,
+    pub args: ExprArgs,
+}
+
+impl Expr {
+    pub fn new(kind: ExprKind, args: ExprArgs) -> Self {
+        Self { kind, args }
+    }
 }
 
 // #[derive(Debug)]
