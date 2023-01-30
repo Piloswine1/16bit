@@ -19,7 +19,8 @@ build:
 ```sh
 cd core
 meson build
-cd build ninja
+cd build
+ninja
 ```
 
 tests (ut test microframework):
