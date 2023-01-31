@@ -5,6 +5,75 @@ use crate::{
     parse::{InstructionParser, ParserHelper},
 };
 
+macro_rules! gen_hand {
+    (ref $i:ident) => {
+        TokenEnum::Ref($i)
+    };
+    (mem $i:ident) => {
+        TokenEnum::Mem($i)
+    };
+    (reg $i:ident) => {
+        TokenEnum::Ident($i)
+    };
+    (lit $i:ident) => {
+        TokenEnum::Lit($i)
+    };
+}
+
+macro_rules! gen_body {
+    (reg $r:ident $res:ident) => {
+        let $r = ParserHelper::parse_reg($r).unwrap();
+        $res.push($r as u8);
+    };
+    (ref $($tail:tt)*) => {gen_body!(reg $($tail)*)};
+    (mem $($tail:tt)*) => {gen_body!(u16 $($tail)*)};
+    (lit $($tail:tt)*) => {gen_body!(u16 $($tail)*)};
+    (u16 $i:ident $res:ident) => {
+        {
+            let (h, l) = parse_u16($i);
+            $res.push(h);
+            $res.push(l);
+        }
+    };
+}
+
+macro_rules! gen_patt {
+    (
+        $args:ident:
+        $(1 $i1:ident($arg11:ident);)*
+        $(2 $i2:ident($arg21:ident, $arg22:ident);)*
+        $(3 $i3:ident($arg31:ident, $arg32:ident, $arg33:ident);)*
+    ) => {
+        match $args {
+            $(
+                ExprArgs::Single(gen_hand!($arg11 arg)) => {
+                    let mut res = vec![Instructions::$i1 as u8];
+                    gen_body!($arg11 arg res);
+                    res
+                }
+            )*
+            $(
+                ExprArgs::Double(gen_hand!($arg21 arg1), gen_hand!($arg22 arg2)) => {
+                    let mut res = vec![Instructions::$i2 as u8];
+                    gen_body!($arg21 arg1 res);
+                    gen_body!($arg22 arg2 res);
+                    res
+                }
+            )*
+            $(
+                ExprArgs::Triple(gen_hand!($arg31 arg1), gen_hand!($arg32 arg2), gen_hand!($arg33 arg3)) => {
+                    let mut res = vec![Instructions::$i3 as u8];
+                    gen_body!($arg31 arg1 res);
+                    gen_body!($arg32 arg2 res);
+                    gen_body!($arg33 arg3 res);
+                    res
+                }
+            )*
+            _ => panic!("{:?} not implemented", $args),
+        }
+    };
+}
+
 #[derive(Debug)]
 struct CodeGen;
 
@@ -49,206 +118,152 @@ impl CodeGen {
         }
     }
 
-    // XXX: write macros
-
     pub fn gen_mov(&mut self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Double(TokenEnum::Lit(lit), TokenEnum::Ident(mb_reg)) => {
-                // XXX: very wrong but for now ok
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::MOV_LIT_REG as u8, lit_h, lit_l, reg as u8]
-            }
-            ExprArgs::Double(TokenEnum::Ident(mb_reg1), TokenEnum::Ident(mb_reg2)) => {
-                let reg1 = ParserHelper::parse_reg(mb_reg1).unwrap();
-                let reg2 = ParserHelper::parse_reg(mb_reg2).unwrap();
-                vec![Instructions::MOV_REG_REG as u8, reg1 as u8, reg2 as u8]
-            }
-            ExprArgs::Double(TokenEnum::Ident(mb_reg), TokenEnum::Mem(mem)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (mem_h, mem_l) = parse_u16(mem);
-                vec![Instructions::MOV_REG_MEM as u8, reg as u8, mem_h, mem_l]
-            }
-            ExprArgs::Double(TokenEnum::Mem(mem), TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (mem_h, mem_l) = parse_u16(mem);
-                vec![Instructions::MOV_MEM_REG as u8, mem_h, mem_l, reg as u8]
-            }
-            ExprArgs::Double(TokenEnum::Lit(lit), TokenEnum::Mem(mem)) => {
-                let (lit_h, lit_l) = parse_u16(lit);
-                let (mem_h, mem_l) = parse_u16(mem);
-                vec![Instructions::MOV_LIT_MEM as u8, lit_h, lit_l, mem_h, mem_l]
-            }
-            ExprArgs::Double(TokenEnum::Ref(mb_regref), TokenEnum::Ident(mb_reg)) => {
-                let regref = ParserHelper::parse_reg(mb_regref).unwrap();
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::MOV_REG_PTR_REG as u8, regref as u8, reg as u8]
-            }
-            ExprArgs::Triple(
-                TokenEnum::Mem(mem),
-                TokenEnum::Ident(mb_reg1),
-                TokenEnum::Ident(mb_reg2),
-            ) => {
-                let reg1 = ParserHelper::parse_reg(mb_reg1).unwrap();
-                let reg2 = ParserHelper::parse_reg(mb_reg2).unwrap();
-                let (mem_h, mem_l) = parse_u16(mem);
-                vec![
-                    Instructions::MOV_LIT_OFF_REG as u8,
-                    mem_h,
-                    mem_l,
-                    reg1 as u8,
-                    reg2 as u8,
-                ]
-            }
-            _ => panic!("mov {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            2 MOV_LIT_REG(lit, reg);
+            2 MOV_REG_REG(reg, reg);
+            2 MOV_REG_MEM(reg, mem);
+            2 MOV_MEM_REG(mem, reg);
+            2 MOV_LIT_MEM(lit, mem);
+            2 MOV_REG_PTR_REG(ref, reg);
+            3 MOV_LIT_OFF_REG(mem, reg, reg);
+        )
     }
 
     fn gen_add(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Double(TokenEnum::Ident(mb_reg1), TokenEnum::Ident(mb_reg2)) => {
-                let reg1 = ParserHelper::parse_reg(mb_reg1).unwrap();
-                let reg2 = ParserHelper::parse_reg(mb_reg2).unwrap();
-                vec![Instructions::ADD_REG_REG as u8, reg1 as u8, reg2 as u8]
-            }
-            ExprArgs::Double(TokenEnum::Lit(lit), TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::ADD_LIT_REG as u8, lit_h, lit_l, reg as u8]
-            }
-            _ => panic!("add {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            2 ADD_REG_REG(reg, reg);
+            2 ADD_LIT_REG(lit, reg);
+        )
     }
 
     fn gen_sub(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Double(TokenEnum::Ident(mb_reg1), TokenEnum::Ident(mb_reg2)) => {
-                let reg1 = ParserHelper::parse_reg(mb_reg1).unwrap();
-                let reg2 = ParserHelper::parse_reg(mb_reg2).unwrap();
-                vec![Instructions::SUB_REG_REG as u8, reg1 as u8, reg2 as u8]
-            }
-            ExprArgs::Double(TokenEnum::Lit(lit), TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::SUB_LIT_REG as u8, lit_h, lit_l, reg as u8]
-            }
-            ExprArgs::Double(TokenEnum::Ident(mb_reg), TokenEnum::Lit(lit)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::SUB_REG_LIT as u8, reg as u8, lit_h, lit_l]
-            }
-            _ => panic!("sub {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            2 SUB_REG_REG(reg, reg);
+            2 SUB_LIT_REG(lit, reg);
+            2 SUB_REG_LIT(reg, lit);
+        )
     }
 
     fn gen_mul(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Double(TokenEnum::Ident(mb_reg1), TokenEnum::Ident(mb_reg2)) => {
-                let reg1 = ParserHelper::parse_reg(mb_reg1).unwrap();
-                let reg2 = ParserHelper::parse_reg(mb_reg2).unwrap();
-                vec![Instructions::MUL_REG_REG as u8, reg1 as u8, reg2 as u8]
-            }
-            ExprArgs::Double(TokenEnum::Lit(lit), TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::MUL_LIT_REG as u8, lit_h, lit_l, reg as u8]
-            }
-            _ => panic!("mul {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            2 MUL_REG_REG(reg, reg);
+            2 MUL_LIT_REG(lit, reg);
+        )
     }
 
     fn gen_push(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Single(TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::PSH_REG as u8, reg as u8]
-            }
-            ExprArgs::Single(TokenEnum::Lit(lit)) => {
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::PSH_LIT as u8, lit_h, lit_l]
-            }
-            _ => panic!("push {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            1 PSH_REG(reg);
+            1 PSH_LIT(lit);
+        )
     }
 
     fn gen_pop(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Single(TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::POP as u8, reg as u8]
-            }
-            _ => panic!("pop {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            1 POP(reg);
+        )
     }
 
     fn gen_call(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Single(TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::CALL_REG as u8, reg as u8]
-            }
-            ExprArgs::Single(TokenEnum::Lit(lit)) => {
-                let (lit_h, lit_l) = parse_u16(lit);
-                vec![Instructions::CALL_LIT as u8, lit_h, lit_l]
-            }
-            _ => panic!("call {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            1 CALL_REG(reg);
+            1 CALL_LIT(lit);
+        )
     }
 
     fn gen_inc(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Single(TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::INC_REG as u8, reg as u8]
-            }
-            _ => panic!("inc {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            1 INC_REG(reg);
+        )
     }
 
     fn gen_dec(&self, args: &ExprArgs) -> Vec<u8> {
-        match args {
-            ExprArgs::Single(TokenEnum::Ident(mb_reg)) => {
-                let reg = ParserHelper::parse_reg(mb_reg).unwrap();
-                vec![Instructions::DEC_REG as u8, reg as u8]
-            }
-            _ => panic!("dec {:?} not implemented", args),
-        }
+        gen_patt!(
+            args:
+            1 DEC_REG(reg);
+        )
     }
 
     fn gen_and(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            2 AND_REG_REG(reg, reg);
+            2 AND_REG_LIT(reg, lit);
+        )
     }
 
     fn gen_or(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            2 OR_REG_REG(reg, reg);
+            2 OR_REG_LIT(reg, lit);
+        )
     }
 
     fn gen_xor(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            2 XOR_REG_REG(reg, reg);
+            2 XOR_REG_LIT(reg, lit);
+        )
     }
 
     fn gen_jmp_eq(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            1 JEQ_REG(reg);
+            1 JEQ_LIT(lit);
+        )
     }
 
     fn gen_jmp_gt(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            1 JGT_REG(reg);
+            1 JGT_LIT(lit);
+        )
     }
 
     fn gen_jmp_not_eq(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            1 JNE_REG(reg);
+            // XXX: fuked up
+            // 1 JNE_LIT(lit);
+        )
     }
 
     fn gen_jmp_lt(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            1 JLT_REG(reg);
+            1 JLT_LIT(lit);
+        )
     }
 
     fn gen_left_shift(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            2 LSF_REG_LIT(reg, lit);
+            2 LSF_REG_REG(reg, reg);
+        )
     }
 
     fn gen_rigth_shift(&self, args: &ExprArgs) -> Vec<u8> {
-        todo!()
+        gen_patt!(
+            args:
+            2 RSF_REG_LIT(reg, lit);
+            2 RSF_REG_REG(reg, reg);
+        )
     }
 }
 

@@ -54,20 +54,6 @@ impl Expr {
     }
 }
 
-// #[derive(Debug)]
-// enum MathExprKind {
-//     Plus,
-//     Minus,
-//     Neg,
-//     Star,
-// }
-//
-// #[derive(Debug)]
-// struct MathExpr {
-//     kind: MathExprKind,
-//     args: (),
-// }
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum S {
     Atom(TokenEnum),

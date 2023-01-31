@@ -75,7 +75,7 @@ impl<'a> InstructionParser {
     ) -> Option<Expr> {
         match lexer.peek() {
             Some(Token {
-                kind: TokenEnum::Comma,
+                kind: TokenEnum::Colon,
                 ..
             }) => {
                 lexer.next();
@@ -108,28 +108,28 @@ impl<'a> InstructionParser {
 
         // Pass label parsing instructions
         match ident_into {
-            "mov" => self.parse_mov(lexer),
-            "add" => self.parse_double_args(lexer, ExprKind::Add),
-            "sub" => self.parse_double_args(lexer, ExprKind::Sub),
-            "mul" => self.parse_double_args(lexer, ExprKind::Mul),
-            "lsf" => self.parse_double_args(lexer, ExprKind::Lsf),
-            "rsf" => self.parse_double_args(lexer, ExprKind::Rsf),
-            "and" => self.parse_double_args(lexer, ExprKind::And),
-            "or" => self.parse_double_args(lexer, ExprKind::Or),
-            "xor" => self.parse_double_args(lexer, ExprKind::Xor),
+            "mov"  => self.parse_mov(lexer),
+            "add"  => self.parse_double_args(lexer, ExprKind::Add),
+            "sub"  => self.parse_double_args(lexer, ExprKind::Sub),
+            "mul"  => self.parse_double_args(lexer, ExprKind::Mul),
+            "lsf"  => self.parse_double_args(lexer, ExprKind::Lsf),
+            "rsf"  => self.parse_double_args(lexer, ExprKind::Rsf),
+            "and"  => self.parse_double_args(lexer, ExprKind::And),
+            "or"   => self.parse_double_args(lexer, ExprKind::Or),
+            "xor"  => self.parse_double_args(lexer, ExprKind::Xor),
             "call" => self.parse_single_args(lexer, ExprKind::Call),
             "push" => self.parse_single_args(lexer, ExprKind::Push),
-            "pop" => self.parse_single_args(lexer, ExprKind::Pop),
-            "not" => self.parse_single_args(lexer, ExprKind::Not),
-            "inc" => self.parse_single_args(lexer, ExprKind::Inc),
-            "dec" => self.parse_single_args(lexer, ExprKind::Dec),
-            "jne" => self.parse_double_args(lexer, ExprKind::JmpNotEQ),
-            "jeq" => self.parse_double_args(lexer, ExprKind::JmpEQ),
-            "jlt" => self.parse_double_args(lexer, ExprKind::JmpLT),
-            "jgt" => self.parse_double_args(lexer, ExprKind::JmpGT),
-            "ret" => Ok(Expr::new(ExprKind::Ret, ExprArgs::NoArgs)),
-            "hlt" => Ok(Expr::new(ExprKind::HLT, ExprArgs::NoArgs)),
-            _ => unimplemented!(),
+            "pop"  => self.parse_single_args(lexer, ExprKind::Pop),
+            "not"  => self.parse_single_args(lexer, ExprKind::Not),
+            "inc"  => self.parse_single_args(lexer, ExprKind::Inc),
+            "dec"  => self.parse_single_args(lexer, ExprKind::Dec),
+            "jne"  => self.parse_double_args(lexer, ExprKind::JmpNotEQ),
+            "jeq"  => self.parse_double_args(lexer, ExprKind::JmpEQ),
+            "jlt"  => self.parse_double_args(lexer, ExprKind::JmpLT),
+            "jgt"  => self.parse_double_args(lexer, ExprKind::JmpGT),
+            "ret"  => Ok(Expr::new(ExprKind::Ret, ExprArgs::NoArgs)),
+            "hlt"  => Ok(Expr::new(ExprKind::HLT, ExprArgs::NoArgs)),
+            _      => unimplemented!(),
         }
     }
 
