@@ -198,9 +198,10 @@ bool CPU::execute(std::uint16_t instruction) {
 		// Move register* to register
 		case Instructions::MOV_REG_PTR_REG: {
 			const auto r1 = this->fetchRegisterIndex();
+			const auto r2 = this->fetchRegisterIndex();
 			const auto ptr = this->_registers.getUint16(r1);
 			const auto value = this->_memory->getUint16(ptr);
-			this->_registers.setUint16(r1, value);
+			this->_registers.setUint16(r2, value);
 			return false;
 		}
 		// Move [lit + reg] to register
