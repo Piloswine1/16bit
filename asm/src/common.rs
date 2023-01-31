@@ -40,6 +40,7 @@ pub enum TokenEnum {
     Question,
     // ident
     Ident(String),
+    Ref(String),
     // invalid
     InvalidIdent,
     EOF,
@@ -53,6 +54,7 @@ impl fmt::Display for TokenEnum {
             TokenEnum::Lit(lit) => write!(f, "{}", lit),
             TokenEnum::Mem(mem) => write!(f, "&{}", mem),
             TokenEnum::Reg(reg) => write!(f, "{:?}", reg),
+            TokenEnum::Ref(ident) => write!(f, "&{}", ident),
             TokenEnum::Comma => write!(f, ","),
             TokenEnum::Plus => write!(f, "+"),
             TokenEnum::Minus => write!(f, "-"),
@@ -62,4 +64,8 @@ impl fmt::Display for TokenEnum {
             _ => return Err(fmt::Error),
         }
     }
+}
+
+pub fn parse_u16(val: &u16) -> (u8, u8) {
+    ((val >> 8) as u8, (*val & 0x00ff) as u8)
 }

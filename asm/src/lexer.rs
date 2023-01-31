@@ -21,18 +21,6 @@ impl Token {
     }
 }
 
-// #[derive(Debug, PartialEq)]
-// pub struct TokenWithSpan {
-//     pub kind: TokenEnum,
-//     pub pos: u32,
-// }
-
-// impl TokenWithSpan {
-//     pub fn new(kind: TokenEnum, pos: u32) -> Self {
-//         Self { kind, pos }
-//     }
-// }
-
 #[derive(Debug)]
 pub struct Cursor<'a> {
     pub cursor: Peekable<Chars<'a>>,
@@ -112,19 +100,6 @@ impl<'a> Cursor<'a> {
             Some('*') => Token::new(TokenEnum::Star, 1),
             Some('-') => Token::new(TokenEnum::Minus, 1),
             Some('\n') => self.parse_newline(),
-            // Some('r') => match self.cursor.next() {
-            //     Some('1') => Token::Reg(crate::common::Regs::R1),
-            //     Some('2') => Token::Reg(crate::common::Regs::R2),
-            //     Some('3') => Token::Reg(crate::common::Regs::R3),
-            //     Some('4') => Token::Reg(crate::common::Regs::R4),
-            //     Some('5') => Token::Reg(crate::common::Regs::R5),
-            //     Some('6') => Token::Reg(crate::common::Regs::R6),
-            //     Some('7') => Token::Reg(crate::common::Regs::R7),
-            //     Some('8') => Token::Reg(crate::common::Regs::R8),
-            //     None => Token::Ident("r".into()),
-            //     // XXX: can be r0 unvalid register, mb can use as variable
-            //     _ => unimplemented!(),
-            // },
             Some(x) if x.is_whitespace() => self.eat_whitespace(),
             Some(c) if c.is_alphabetic() => self.parse_ident(c),
             None => Token::new(TokenEnum::EOF, 0),
@@ -163,6 +138,13 @@ impl<'a> Cursor<'a> {
     }
 
     fn parse_mem(&mut self) -> Token {
+        if let Some(ident) = self.try_parse_ident() {
+            // hacky way to take ident
+            let ident_inner = ident.kind.to_string();
+            let len = (ident_inner.len() + 1) as u32;
+            return Token::new(TokenEnum::Ref(ident_inner), len);
+        }
+
         match self.parse_hex() {
             Ok((x, size)) => Token::new(TokenEnum::Mem(x), size + 1),
             Err(_) => Token::new(TokenEnum::InvalidIdent, 0),
@@ -201,6 +183,16 @@ impl<'a> Cursor<'a> {
         }
         let len = ident.len() as u32;
         Token::new(TokenEnum::Ident(ident.clone()), len)
+    }
+
+    fn try_parse_ident(&mut self) -> Option<Token> {
+        match self.cursor.peek() {
+            Some(c) if !c.is_numeric() => {
+                let first_char = self.cursor.next().unwrap();
+                Some(self.parse_ident(first_char))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -263,6 +255,35 @@ fn parse_expression() {
             Token::new(TokenEnum::Whitespace, 1),
             Token::new(TokenEnum::Lit(10), 3),
             Token::new(TokenEnum::CloseBracket, 1),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("acc".into()), 3),
+        ]
+    )
+}
+
+#[test]
+fn parse_reg_ref() {
+    let tokens: Vec<_> = tokenize_old("mov &r1, r2").collect();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ref("r1".into()), 3),
+            Token::new(TokenEnum::Comma, 1),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ident("r2".into()), 2),
+        ]
+    );
+
+    let tokens: Vec<_> = tokenize_old("mov &acc, acc").collect();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::new(TokenEnum::Ident("mov".into()), 3),
+            Token::new(TokenEnum::Whitespace, 1),
+            Token::new(TokenEnum::Ref("acc".into()), 4),
             Token::new(TokenEnum::Comma, 1),
             Token::new(TokenEnum::Whitespace, 1),
             Token::new(TokenEnum::Ident("acc".into()), 3),

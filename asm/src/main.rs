@@ -27,10 +27,10 @@ struct Args {
 }
 
 fn main() -> std::io::Result<()> {
-    use parse::Parser;
+    use parse::InstructionParser;
 
     let args = Args::parse();
-    let mut parser = Parser::new();
+    let mut parser = InstructionParser::new();
 
     let file = File::open(args.input)?;
     let mut buf_reader = BufReader::new(file);

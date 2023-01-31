@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::lexer::Token;
+use crate::common::TokenEnum;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
@@ -14,6 +14,8 @@ pub enum ExprKind {
     Inc,
     Dec,
     Not,
+    Lsf,
+    Rsf,
     JmpEQ,
     JmpNotEQ,
     JmpGT,
@@ -34,10 +36,10 @@ pub enum ExprKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprArgs {
     NoArgs,
-    Single(Token),
-    Complex(S, Token),
-    Double(Token, Token),
-    Triple(Token, Token, Token),
+    Single(TokenEnum),
+    Complex(S, TokenEnum),
+    Double(TokenEnum, TokenEnum),
+    Triple(TokenEnum, TokenEnum, TokenEnum),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,8 +70,8 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum S {
-    Atom(Token),
-    Cons(Token, Vec<S>),
+    Atom(TokenEnum),
+    Cons(TokenEnum, Vec<S>),
 }
 
 impl fmt::Display for S {
